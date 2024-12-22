@@ -1,0 +1,15 @@
+cmake_minimum_required(VERSION 3.20)
+SET(CMAKE_C_STANDARD 99)
+
+SET(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+PROJECT(rt_app)
+
+ADD_SUBDIRECTORY(DarkMatter)
+
+SET(SOURCES app.c)
+
+ADD_EXECUTABLE(${PROJECT_NAME} ${SOURCES})
+
+ADD_COMPILE_OPTIONS(-g -gcodeview)
+TARGET_LINK_LIBRARIES(${PROJECT_NAME} PUBLIC DarkMatter -fuse-ld=lld -Wl,/debug,/pdb:name.pdb)
