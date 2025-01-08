@@ -1,4 +1,4 @@
-struct VERTEX_IN
+struct VERTEX_OUT 
 {
     float4 pos : SV_POSITION;
 };
@@ -8,7 +8,7 @@ struct PIXEL_OUT
     float4 color : SV_TARGET;
 };
 
-PIXEL_OUT main(VERTEX_IN v_in)
+PIXEL_OUT main(VERTEX_OUT v_in)
 {
     PIXEL_OUT p_out;
 
