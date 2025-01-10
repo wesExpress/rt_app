@@ -3,6 +3,7 @@
 typedef struct vertex_t
 {
     float pos[3];
+    float color[4];
 } vertex;
 
 typedef struct application_data_t
@@ -15,9 +16,9 @@ typedef struct application_data_t
 } application_data;
 
 const vertex triangle[] = {
-    { -0.5f,-0.5f,0.f },
-    {  0.5f,-0.5f,0.f },
-    {  0.f,  0.5f,0.f }
+    { { -0.5f,-0.5f,0.f }, { 1.f,0.f,0.f,1.f } },
+    { {  0.5f,-0.5f,0.f }, { 0.f,1.f,0.f,1.f } },
+    { {  0.f,  0.5f,0.f }, { 0.f,0.f,1.f,1.f } }
 };
 
 void dm_application_setup(dm_context_init_packet* init_packet)
@@ -34,15 +35,24 @@ bool dm_application_init(dm_context* context)
         dm_raster_pipeline_desc desc = { 0 };
        
         // input assembler
-        dm_input_element_desc* input = &desc.input_assembler.input_elements[0];
+        dm_input_element_desc* input = desc.input_assembler.input_elements;
         dm_strcpy(input->name, "POSITION");
         input->format = DM_INPUT_ELEMENT_FORMAT_FLOAT_3;
         input->class  = DM_INPUT_ELEMENT_CLASS_PER_VERTEX;
         input->stride = sizeof(vertex);
+        input->offset = offsetof(vertex, pos);
+
+        input++;
+
+        dm_strcpy(input->name, "COLOR");
+        input->format = DM_INPUT_ELEMENT_FORMAT_FLOAT_4;
+        input->class  = DM_INPUT_ELEMENT_CLASS_PER_VERTEX;
+        input->stride = sizeof(vertex);
+        input->offset = offsetof(vertex, color);
 
         desc.input_assembler.topology = DM_INPUT_TOPOLOGY_TRIANGLE_LIST;
 
-        desc.input_assembler.input_element_count = 1;
+        desc.input_assembler.input_element_count = 2;
 
         // rasterizer
         desc.rasterizer.cull_mode    = DM_RASTERIZER_CULL_MODE_BACK;
