@@ -9,7 +9,7 @@ typedef struct vertex_t
 typedef struct application_data_t
 {
     dm_render_handle raster_pipe;
-    dm_render_handle vb;
+    dm_render_handle vb, ib;
 
     dm_timer frame_timer;
     uint16_t frame_count;
@@ -20,6 +20,15 @@ const vertex triangle[] = {
     { {  0.5f,-0.5f,0.f }, { 0.f,1.f,0.f,1.f } },
     { {  0.f,  0.5f,0.f }, { 0.f,0.f,1.f,1.f } }
 };
+
+const vertex quad[] = {
+    { { -0.5f,-0.5f,0.f }, { 1.f,0.f,0.f,1.f } },
+    { {  0.5f,-0.5f,0.f }, { 0.f,1.f,0.f,1.f } },
+    { { -0.5f, 0.5f,0.f }, { 0.f,0.f,1.f,1.f } },
+    { {  0.5f, 0.5f,0.f }, { 1.f,1.f,0.f,1.f } }
+};
+
+const uint32_t quad_indices[] = { 0,1,2, 3,2,1 };
 
 void dm_application_setup(dm_context_init_packet* init_packet)
 {
@@ -78,12 +87,24 @@ bool dm_application_init(dm_context* context)
     // === vertex buffer ===
     {
         dm_vertex_buffer_desc desc = { 0 };
-        desc.size         = sizeof(triangle);
+        //desc.size         = sizeof(triangle);
+        desc.size         = sizeof(quad);
         desc.element_size = sizeof(float);
         desc.stride       = sizeof(vertex);
-        desc.data         = (void*)triangle;
+        //desc.data         = (void*)triangle;
+        desc.data         = (void*)quad;
 
         if(!dm_renderer_create_vertex_buffer(desc, &app_data->vb, context)) return false;
+    }
+
+    // === index buffer ===
+    {
+        dm_index_buffer_desc desc = { 0 };
+        desc.size         = sizeof(quad_indices);
+        desc.element_size = sizeof(uint32_t);
+        desc.data         = (void*)quad_indices;
+
+        if(!dm_renderer_create_index_buffer(desc, &app_data->ib, context)) return false;
     }
 
     // misc
@@ -120,7 +141,9 @@ bool dm_application_render(dm_context* context)
 
     dm_render_command_bind_raster_pipeline(app_data->raster_pipe, context);
     dm_render_command_bind_vertex_buffer(app_data->vb, context);
-    dm_render_command_draw_instanced(1,0,_countof(triangle),0, context);
+    dm_render_command_bind_index_buffer(app_data->ib, context);
+    //dm_render_command_draw_instanced(1,0,_countof(quad),0, context);
+    dm_render_command_draw_instanced_indexed(1,0, 6,0, 0, context);
 
     return true;
 }
