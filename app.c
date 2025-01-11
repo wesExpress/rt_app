@@ -103,6 +103,7 @@ bool dm_application_init(dm_context* context)
         desc.size         = sizeof(quad_indices);
         desc.element_size = sizeof(uint32_t);
         desc.data         = (void*)quad_indices;
+        desc.index_type   = DM_INDEX_BUFFER_INDEX_TYPE_UINT32;
 
         if(!dm_renderer_create_index_buffer(desc, &app_data->ib, context)) return false;
     }
