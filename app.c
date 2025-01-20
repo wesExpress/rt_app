@@ -21,24 +21,74 @@ const vertex quad[] = {
 
 const uint32_t quad_indices[] = { 0,1,2, 3,2,1 };
 
+const vertex cube[] = {
+    // front face
+    { { -0.5f,-0.5f,0.5f }, {1.0f,0.f,0.f,1.f } },  // 0
+    { {  0.5f,-0.5f,0.5f }, {1.0f,0.f,0.f,1.f } },  // 1
+    { { -0.5f, 0.5f,0.5f }, {1.0f,0.f,0.f,1.f } },  // 2
+    { {  0.5f, 0.5f,0.5f }, {1.0f,0.f,0.f,1.f } },  // 3
+
+    // back face
+    { { -0.5f,-0.5f,-0.5f }, {0.0f,1.f,0.f,1.f } }, // 4
+    { {  0.5f,-0.5f,-0.5f }, {0.0f,1.f,0.f,1.f } }, // 5
+    { { -0.5f, 0.5f,-0.5f }, {0.0f,1.f,0.f,1.f } }, // 6
+    { {  0.5f, 0.5f,-0.5f }, {0.0f,1.f,0.f,1.f } }, // 7
+    
+    // left face
+    { { -0.5f,-0.5f,-0.5f }, {0.0f,0.f,1.f,1.f } },  // 8
+    { { -0.5f,-0.5f, 0.5f }, {0.0f,0.f,1.f,1.f } },  // 9
+    { { -0.5f, 0.5f, 0.5f }, {0.0f,0.f,1.f,1.f } },  // 10
+    { { -0.5f, 0.5f,-0.5f }, {0.0f,0.f,1.f,1.f } },  // 11
+
+    // right face
+    { {  0.5f,-0.5f,-0.5f }, {1.0f,1.f,0.f,1.f } },  // 12 
+    { {  0.5f,-0.5f, 0.5f }, {1.0f,1.f,0.f,1.f } },  // 13
+    { {  0.5f, 0.5f, 0.5f }, {1.0f,1.f,0.f,1.f } },  // 14
+    { {  0.5f, 0.5f,-0.5f }, {1.0f,1.f,0.f,1.f } },  // 15
+    
+    // top face
+    { { -0.5f, 0.5f, 0.5f }, {1.0f,0.f,1.f,1.f } },  // 16 
+    { {  0.5f, 0.5f, 0.5f }, {1.0f,0.f,1.f,1.f } },  // 17
+    { { -0.5f, 0.5f,-0.5f }, {1.0f,0.f,1.f,1.f } },  // 18
+    { {  0.5f, 0.5f,-0.5f }, {1.0f,0.f,1.f,1.f } },  // 19
+
+    // bottom face
+    { { -0.5f,-0.5f, 0.5f }, {0.0f,1.f,1.f,1.f } },  // 20 
+    { {  0.5f,-0.5f, 0.5f }, {0.0f,1.f,1.f,1.f } },  // 21 
+    { { -0.5f,-0.5f,-0.5f }, {0.0f,1.f,1.f,1.f } },  // 22 
+    { {  0.5f,-0.5f,-0.5f }, {0.0f,1.f,1.f,1.f } },  // 23 
+};
+
+const uint32_t cube_indices[] = {
+    0,1,2, 3,2,1,
+
+    4,6,5, 7,5,6,
+
+    8,9,10, 10,11,8,
+
+    12,15,14, 14,13,12,
+
+    16,17,18, 18,17,19,
+
+    22,23,21, 21,20,22 
+};
+
 typedef struct simple_camera_t
 {
     dm_vec3 pos, forward, up;
     dm_mat4 view, proj;
 } simple_camera;
 
-typedef struct camera_uniform_data_t 
-{
-    dm_mat4 mvp;
-} camera_uniform_data;
-
 typedef struct application_data_t
 {
     dm_render_handle raster_pipe;
     dm_render_handle vb, ib, cb;
 
-    simple_camera       camera;
-    camera_uniform_data mvp;
+    simple_camera camera;
+    dm_mat4       model;
+    dm_mat4       mvp;
+    dm_vec3       axis;
+    float         angle;
 
     dm_timer frame_timer;
     uint16_t frame_count;
@@ -55,25 +105,23 @@ bool dm_application_init(dm_context* context)
 
     // === camera ===
     {
-        app_data->camera.pos[2] = -3.f;
+        app_data->camera.pos[2] = 3.f;
         app_data->camera.up[1]  = 1.f;
         dm_vec3_negate(app_data->camera.pos, app_data->camera.forward);
         
         dm_mat_view(app_data->camera.pos, app_data->camera.forward, app_data->camera.up, app_data->camera.view);
-        dm_mat_perspective(65.f, (float)context->renderer.width / (float)context->renderer.height, 0.01f, 1000.f, app_data->camera.proj);
+        dm_mat_perspective(DM_MATH_DEG_TO_RAD * 85.f, (float)context->renderer.width / (float)context->renderer.height, 0.1f, 1000.f, app_data->camera.proj);
 
-        dm_mat4_mul_mat4(app_data->camera.view, app_data->camera.proj, app_data->mvp.mvp);
+        dm_mat4_mul_mat4(app_data->camera.view, app_data->camera.proj, app_data->mvp);
     }
 
     // === vertex buffer ===
     {
         dm_vertex_buffer_desc desc = { 0 };
-        //desc.size         = sizeof(triangle);
-        desc.size         = sizeof(quad);
+        desc.size         = sizeof(cube);
         desc.element_size = sizeof(float);
         desc.stride       = sizeof(vertex);
-        //desc.data         = (void*)triangle;
-        desc.data         = (void*)quad;
+        desc.data         = (void*)cube;
 
         if(!dm_renderer_create_vertex_buffer(desc, &app_data->vb, context)) return false;
     }
@@ -81,9 +129,9 @@ bool dm_application_init(dm_context* context)
     // === index buffer ===
     {
         dm_index_buffer_desc desc = { 0 };
-        desc.size         = sizeof(quad_indices);
+        desc.size         = sizeof(cube_indices);
         desc.element_size = sizeof(uint32_t);
-        desc.data         = (void*)quad_indices;
+        desc.data         = (void*)cube_indices;
         desc.index_type   = DM_INDEX_BUFFER_INDEX_TYPE_UINT32;
 
         if(!dm_renderer_create_index_buffer(desc, &app_data->ib, context)) return false;
@@ -92,8 +140,8 @@ bool dm_application_init(dm_context* context)
     // === constant buffer ===
     {
         dm_constant_buffer_desc desc = { 0 };
-        desc.size = sizeof(camera_uniform_data);
-        desc.data = app_data->mvp.mvp;
+        desc.size = sizeof(dm_mat4);
+        desc.data = app_data->mvp;
 
         if(!dm_renderer_create_constant_buffer(desc, &app_data->cb, context)) return false;
     }
@@ -157,6 +205,12 @@ bool dm_application_init(dm_context* context)
     // misc
     dm_timer_start(&app_data->frame_timer, context);
 
+    dm_mat4_identity(app_data->model);
+    app_data->axis[0] = 1.f;
+    app_data->axis[1] = 1.f;
+    app_data->axis[2] = 1.f;
+    dm_vec3_norm(app_data->axis, app_data->axis);
+
     return true;
 }
 
@@ -181,22 +235,25 @@ bool dm_application_update(dm_context* context)
 
     // camera buffer 
     dm_vec3 move = { 0 };
+
+    // z direction (into screen is negative)
     if(dm_input_is_key_pressed(DM_KEY_W, context))
-    {
-        move[2] = 1.f;
-    }
-    else if(dm_input_is_key_pressed(DM_KEY_S, context))
     {
         move[2] = -1.f;
     }
+    else if(dm_input_is_key_pressed(DM_KEY_S, context))
+    {
+        move[2] = 1.f;
+    }
 
+    // x direction
     if(dm_input_is_key_pressed(DM_KEY_A, context))
     {
-        move[0] = 1.f;
+        move[0] = -1.f;
     }
     else if(dm_input_is_key_pressed(DM_KEY_D, context))
     {
-        move[0] = -1.f;
+        move[0] = 1.f;
     }
 
     dm_vec3_norm(move, move);
@@ -206,9 +263,23 @@ bool dm_application_update(dm_context* context)
     dm_vec3 target = { 0 };
     dm_vec3_add_vec3(app_data->camera.pos, app_data->camera.forward, target);
     dm_mat_view(app_data->camera.pos, target, app_data->camera.up, app_data->camera.view);
-    dm_mat4_mul_mat4(app_data->camera.view, app_data->camera.proj, app_data->mvp.mvp);
+
+    // model matrix
+    app_data->angle += 45.f * context->delta;
+    if(app_data->angle > 365.f) app_data->angle -= 365.f;
+
+    dm_quat orientation;
+    dm_quat_from_axis_angle_deg(app_data->axis, app_data->angle, orientation);
+
+    dm_mat4 rotate;
+    dm_mat4_rotate_from_quat(orientation, rotate);
+
+    dm_mat4 mvp;
+    dm_mat4_mul_mat4(app_data->model, rotate, mvp);
+    dm_mat4_mul_mat4(mvp, app_data->camera.view, mvp);
+    dm_mat4_mul_mat4(mvp, app_data->camera.proj, app_data->mvp);
 #ifdef DM_DIRECTX12
-    dm_mat4_transpose(app_data->mvp.mvp, app_data->mvp.mvp);
+    dm_mat4_transpose(app_data->mvp, app_data->mvp);
 #endif
 
     return true;
@@ -218,7 +289,7 @@ bool dm_application_render(dm_context* context)
 {
     application_data* app_data = context->app_data;
 
-    dm_render_command_update_constant_buffer(app_data->mvp.mvp, sizeof(dm_mat4), app_data->cb, context);
+    dm_render_command_update_constant_buffer(app_data->mvp, sizeof(dm_mat4), app_data->cb, context);
 
     dm_render_command_bind_raster_pipeline(app_data->raster_pipe, context);
     dm_render_command_bind_descriptor_group(app_data->raster_pipe, 0, context);
@@ -226,7 +297,7 @@ bool dm_application_render(dm_context* context)
     dm_render_command_bind_vertex_buffer(app_data->vb, context);
     dm_render_command_bind_index_buffer(app_data->ib, context);
 
-    dm_render_command_draw_instanced_indexed(1,0, 6,0, 0, context);
+    dm_render_command_draw_instanced_indexed(1,0, _countof(cube_indices),0, 0, context);
 
     return true;
 }

@@ -15,5 +15,5 @@ if(VULKAN)
     ADD_DEFINITIONS(-DDM_VULKAN)
 endif()
 
-ADD_COMPILE_OPTIONS(-g -gcodeview)
+TARGET_COMPILE_OPTIONS(${PROJECT_NAME} PUBLIC -g -gcodeview -march=native)
 TARGET_LINK_LIBRARIES(${PROJECT_NAME} PUBLIC DarkMatter -fuse-ld=lld -Wl,/debug,/pdb:name.pdb)

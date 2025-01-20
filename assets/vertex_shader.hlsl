@@ -19,7 +19,7 @@ VERTEX_OUT main(VERTEX_IN v_in)
 {
     VERTEX_OUT v_out;
 
-    v_out.pos   = float4(v_in.pos.x, -v_in.pos.y, v_in.pos.z, 1.f);
+    v_out.pos   = float4(v_in.pos.x, v_in.pos.y, v_in.pos.z, 1.f);
     v_out.pos   = mul(v_out.pos, view_proj);
 
     v_out.color = v_in.color;
