@@ -140,6 +140,16 @@ bool dm_application_init(dm_context* context)
         desc.viewport.type = DM_VIEWPORT_TYPE_DEFAULT;
         desc.scissor.type  = DM_SCISSOR_TYPE_DEFAULT;
 
+        // descriptor groups
+        desc.descriptor_group[0].ranges[0].type       = DM_DESCRIPTOR_RANGE_TYPE_CONSTANT_BUFFER;
+        desc.descriptor_group[0].ranges[0].flags      = DM_DESCRIPTOR_FLAG_VERTEX_SHADER;
+        desc.descriptor_group[0].ranges[0].count      = 1;
+        desc.descriptor_group[0].ranges[0].handles[0] = app_data->cb;
+
+        desc.descriptor_group[0].range_count     = 1;
+
+        desc.descriptor_group_count = 1;
+
         if(!dm_renderer_create_raster_pipeline(desc, &app_data->raster_pipe, context)) return false;
     }
 
@@ -170,25 +180,32 @@ bool dm_application_update(dm_context* context)
     }
 
     // camera buffer 
+    dm_vec3 move = { 0 };
     if(dm_input_is_key_pressed(DM_KEY_W, context))
     {
-        app_data->camera.pos[2] += 1.f * context->delta;
+        move[2] = 1.f;
     }
     else if(dm_input_is_key_pressed(DM_KEY_S, context))
     {
-        app_data->camera.pos[2] -= 1.f * context->delta;
+        move[2] = -1.f;
     }
 
     if(dm_input_is_key_pressed(DM_KEY_A, context))
     {
-        app_data->camera.pos[0] -= 1.f * context->delta;
+        move[0] = 1.f;
     }
     else if(dm_input_is_key_pressed(DM_KEY_D, context))
     {
-        app_data->camera.pos[0] += 1.f * context->delta;
+        move[0] = -1.f;
     }
 
-    dm_mat_view(app_data->camera.pos, app_data->camera.forward, app_data->camera.up, app_data->camera.view);
+    dm_vec3_norm(move, move);
+    dm_vec3_scale(move, 5.f * context->delta, move);
+    if(dm_vec3_mag2(move)>0) dm_vec3_add_vec3(app_data->camera.pos, move, app_data->camera.pos);
+
+    dm_vec3 target = { 0 };
+    dm_vec3_add_vec3(app_data->camera.pos, app_data->camera.forward, target);
+    dm_mat_view(app_data->camera.pos, target, app_data->camera.up, app_data->camera.view);
     dm_mat4_mul_mat4(app_data->camera.view, app_data->camera.proj, app_data->mvp.mvp);
 
     return true;
@@ -201,9 +218,11 @@ bool dm_application_render(dm_context* context)
     dm_render_command_update_constant_buffer(app_data->mvp.mvp, sizeof(dm_mat4), app_data->cb, context);
 
     dm_render_command_bind_raster_pipeline(app_data->raster_pipe, context);
+    dm_render_command_bind_descriptor_group(app_data->raster_pipe, 0, context);
+
     dm_render_command_bind_vertex_buffer(app_data->vb, context);
     dm_render_command_bind_index_buffer(app_data->ib, context);
-    //dm_render_command_draw_instanced(1,0,_countof(quad),0, context);
+
     dm_render_command_draw_instanced_indexed(1,0, 6,0, 0, context);
 
     return true;
