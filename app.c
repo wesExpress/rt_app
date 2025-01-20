@@ -207,6 +207,9 @@ bool dm_application_update(dm_context* context)
     dm_vec3_add_vec3(app_data->camera.pos, app_data->camera.forward, target);
     dm_mat_view(app_data->camera.pos, target, app_data->camera.up, app_data->camera.view);
     dm_mat4_mul_mat4(app_data->camera.view, app_data->camera.proj, app_data->mvp.mvp);
+#ifdef DM_DIRECTX12
+    dm_mat4_transpose(app_data->mvp.mvp, app_data->mvp.mvp);
+#endif
 
     return true;
 }
