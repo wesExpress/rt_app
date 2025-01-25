@@ -1,6 +1,3 @@
 [submodule "DarkMatter"]
 	path = DarkMatter
 	url = https://github.com/wesExpress/DarkMatter.git
-[submodule "clay"]
-	path = clay
-	url = https://github.com/nicbarker/clay.git
