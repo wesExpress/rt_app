@@ -6,6 +6,13 @@ typedef struct vertex_t
     float color[4];
 } vertex;
 
+typedef struct gui_vertex_t
+{
+    float pos[2];
+    float uv[2];
+    float color[4];
+} gui_vertex;
+
 const vertex triangle[] = {
     { { -0.5f,-0.5f,0.f }, { 1.f,0.f,0.f,1.f } },
     { {  0.5f,-0.5f,0.f }, { 0.f,1.f,0.f,1.f } },
@@ -73,6 +80,9 @@ const uint32_t cube_indices[] = {
     22,23,21, 21,20,22 
 };
 
+#define MAX_GUI_VERTICES 100
+gui_vertex gui_vertices[MAX_GUI_VERTICES] = { 0 };
+
 typedef struct simple_camera_t
 {
     dm_vec3 pos, forward, up;
@@ -83,6 +93,9 @@ typedef struct application_data_t
 {
     dm_render_handle raster_pipe;
     dm_render_handle vb, ib, cb;
+
+    dm_render_handle gui_vb;
+    dm_render_handle gui_pipe;
 
     simple_camera camera;
     dm_mat4       model;
@@ -211,6 +224,50 @@ bool dm_application_init(dm_context* context)
     app_data->axis[2] = 1.f;
     dm_vec3_norm(app_data->axis, app_data->axis);
 
+    // gui
+    {
+        dm_raster_pipeline_desc desc = { 0 };
+
+        dm_input_element_desc* input = desc.input_assembler.input_elements;
+        dm_strcpy(input->name, "POSITION");
+        input->format = DM_INPUT_ELEMENT_FORMAT_FLOAT_2;
+        input->class  = DM_INPUT_ELEMENT_CLASS_PER_VERTEX;
+        input->stride = sizeof(gui_vertex);
+        input->offset = offsetof(gui_vertex, pos);
+
+        input++;
+
+        dm_strcpy(input->name, "TEX_COORDS");
+        input->format = DM_INPUT_ELEMENT_FORMAT_FLOAT_2;
+        input->class  = DM_INPUT_ELEMENT_CLASS_PER_VERTEX;
+        input->stride = sizeof(gui_vertex);
+        input->offset = offsetof(gui_vertex, pos);
+
+        input++;
+
+        dm_strcpy(input->name, "COLOR");
+        input->format = DM_INPUT_ELEMENT_FORMAT_FLOAT_4;
+        input->class  = DM_INPUT_ELEMENT_CLASS_PER_VERTEX;
+        input->stride = sizeof(gui_vertex);
+        input->offset = offsetof(gui_vertex, color);
+
+        desc.input_assembler.topology = DM_INPUT_TOPOLOGY_TRIANGLE_LIST;
+
+        desc.input_assembler.input_element_count = 3;
+
+        // rasterizer
+        desc.rasterizer.cull_mode    = DM_RASTERIZER_CULL_MODE_BACK;
+        desc.rasterizer.polygon_fill = DM_RASTERIZER_POLYGON_FILL_FILL;
+        desc.rasterizer.front_face   = DM_RASTERIZER_FRONT_FACE_COUNTER_CLOCKWISE;
+        dm_strcpy(desc.rasterizer.vertex_shader_desc.path, "assets/gui_vertex.cso");
+        dm_strcpy(desc.rasterizer.pixel_shader_desc.path,  "assets/gui_pixel.cso");
+
+        desc.viewport.type = DM_VIEWPORT_TYPE_DEFAULT;
+        desc.scissor.type  = DM_SCISSOR_TYPE_DEFAULT;
+
+        if(!dm_renderer_create_raster_pipeline(desc, &app_data->gui_pipe, context)) return false;
+    }
+
     return true;
 }
 
@@ -289,6 +346,7 @@ bool dm_application_render(dm_context* context)
 {
     application_data* app_data = context->app_data;
 
+    // object rendering
     dm_render_command_update_constant_buffer(app_data->mvp, sizeof(dm_mat4), app_data->cb, context);
 
     dm_render_command_bind_raster_pipeline(app_data->raster_pipe, context);
@@ -298,6 +356,9 @@ bool dm_application_render(dm_context* context)
     dm_render_command_bind_index_buffer(app_data->ib, context);
 
     dm_render_command_draw_instanced_indexed(1,0, _countof(cube_indices),0, 0, context);
+
+    // gui rendering
+    dm_render_command_bind_raster_pipeline(app_data->gui_pipe, context);
 
     return true;
 }
