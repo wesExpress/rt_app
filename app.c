@@ -1,10 +1,5 @@
 #include "dm.h"
-
-typedef struct vertex_t
-{
-    float pos[3];
-    float color[4];
-} vertex;
+#include "data.h"
 
 typedef struct gui_vertex_t
 {
@@ -13,75 +8,7 @@ typedef struct gui_vertex_t
     float color[4];
 } gui_vertex;
 
-const vertex triangle[] = {
-    { { -0.5f,-0.5f,0.f }, { 1.f,0.f,0.f,1.f } },
-    { {  0.5f,-0.5f,0.f }, { 0.f,1.f,0.f,1.f } },
-    { {  0.f,  0.5f,0.f }, { 0.f,0.f,1.f,1.f } }
-};
-
-const vertex quad[] = {
-    { { -0.5f,-0.5f,0.f }, { 1.f,0.f,0.f,1.f } },
-    { {  0.5f,-0.5f,0.f }, { 0.f,1.f,0.f,1.f } },
-    { { -0.5f, 0.5f,0.f }, { 0.f,0.f,1.f,1.f } },
-    { {  0.5f, 0.5f,0.f }, { 1.f,1.f,0.f,1.f } }
-};
-
-const uint32_t quad_indices[] = { 0,1,2, 3,2,1 };
-
-const vertex cube[] = {
-    // front face
-    { { -0.5f,-0.5f,0.5f }, {1.0f,0.f,0.f,1.f } },  // 0
-    { {  0.5f,-0.5f,0.5f }, {1.0f,0.f,0.f,1.f } },  // 1
-    { { -0.5f, 0.5f,0.5f }, {1.0f,0.f,0.f,1.f } },  // 2
-    { {  0.5f, 0.5f,0.5f }, {1.0f,0.f,0.f,1.f } },  // 3
-
-    // back face
-    { { -0.5f,-0.5f,-0.5f }, {0.0f,1.f,0.f,1.f } }, // 4
-    { {  0.5f,-0.5f,-0.5f }, {0.0f,1.f,0.f,1.f } }, // 5
-    { { -0.5f, 0.5f,-0.5f }, {0.0f,1.f,0.f,1.f } }, // 6
-    { {  0.5f, 0.5f,-0.5f }, {0.0f,1.f,0.f,1.f } }, // 7
-    
-    // left face
-    { { -0.5f,-0.5f,-0.5f }, {0.0f,0.f,1.f,1.f } },  // 8
-    { { -0.5f,-0.5f, 0.5f }, {0.0f,0.f,1.f,1.f } },  // 9
-    { { -0.5f, 0.5f, 0.5f }, {0.0f,0.f,1.f,1.f } },  // 10
-    { { -0.5f, 0.5f,-0.5f }, {0.0f,0.f,1.f,1.f } },  // 11
-
-    // right face
-    { {  0.5f,-0.5f,-0.5f }, {1.0f,1.f,0.f,1.f } },  // 12 
-    { {  0.5f,-0.5f, 0.5f }, {1.0f,1.f,0.f,1.f } },  // 13
-    { {  0.5f, 0.5f, 0.5f }, {1.0f,1.f,0.f,1.f } },  // 14
-    { {  0.5f, 0.5f,-0.5f }, {1.0f,1.f,0.f,1.f } },  // 15
-    
-    // top face
-    { { -0.5f, 0.5f, 0.5f }, {1.0f,0.f,1.f,1.f } },  // 16 
-    { {  0.5f, 0.5f, 0.5f }, {1.0f,0.f,1.f,1.f } },  // 17
-    { { -0.5f, 0.5f,-0.5f }, {1.0f,0.f,1.f,1.f } },  // 18
-    { {  0.5f, 0.5f,-0.5f }, {1.0f,0.f,1.f,1.f } },  // 19
-
-    // bottom face
-    { { -0.5f,-0.5f, 0.5f }, {0.0f,1.f,1.f,1.f } },  // 20 
-    { {  0.5f,-0.5f, 0.5f }, {0.0f,1.f,1.f,1.f } },  // 21 
-    { { -0.5f,-0.5f,-0.5f }, {0.0f,1.f,1.f,1.f } },  // 22 
-    { {  0.5f,-0.5f,-0.5f }, {0.0f,1.f,1.f,1.f } },  // 23 
-};
-
-const uint32_t cube_indices[] = {
-    0,1,2, 3,2,1,
-
-    4,6,5, 7,5,6,
-
-    8,9,10, 10,11,8,
-
-    12,15,14, 14,13,12,
-
-    16,17,18, 18,17,19,
-
-    22,23,21, 21,20,22 
-};
-
 #define MAX_GUI_VERTICES 100
-gui_vertex gui_vertices[MAX_GUI_VERTICES] = { 0 };
 
 typedef struct simple_camera_t
 {
@@ -94,14 +21,20 @@ typedef struct application_data_t
     dm_render_handle raster_pipe;
     dm_render_handle vb, ib, cb;
 
-    dm_render_handle gui_vb;
+    dm_render_handle gui_vb, gui_cb;
     dm_render_handle gui_pipe;
+    dm_font          gui_font;
+
+    gui_vertex gui_vertices[MAX_GUI_VERTICES];
+    uint32_t   gui_vertex_count;
 
     simple_camera camera;
     dm_mat4       model;
     dm_mat4       mvp;
     dm_vec3       axis;
     float         angle;
+
+    dm_mat4 gui_proj;
 
     dm_timer frame_timer;
     uint16_t frame_count;
@@ -203,11 +136,10 @@ bool dm_application_init(dm_context* context)
 
         // descriptor groups
         desc.descriptor_group[0].ranges[0].type       = DM_DESCRIPTOR_RANGE_TYPE_CONSTANT_BUFFER;
-        desc.descriptor_group[0].ranges[0].flags      = DM_DESCRIPTOR_FLAG_VERTEX_SHADER;
         desc.descriptor_group[0].ranges[0].count      = 1;
-        desc.descriptor_group[0].ranges[0].handles[0] = app_data->cb;
+        desc.descriptor_group[0].flags                = DM_DESCRIPTOR_GROUP_FLAG_VERTEX_SHADER;
 
-        desc.descriptor_group[0].range_count     = 1;
+        desc.descriptor_group[0].range_count = 1;
 
         desc.descriptor_group_count = 1;
 
@@ -226,6 +158,27 @@ bool dm_application_init(dm_context* context)
 
     // gui
     {
+        if(!dm_renderer_load_font("assets/JetBrainsMono-Regular.ttf", 16, &app_data->gui_font, context)) return false;
+
+        dm_vertex_buffer_desc vb_desc = { 0 };
+        vb_desc.stride       = sizeof(gui_vertex);
+        vb_desc.element_size = sizeof(float);
+        vb_desc.size         = sizeof(gui_vertex) * MAX_GUI_VERTICES;
+        vb_desc.data         = NULL;
+
+        if(!dm_renderer_create_vertex_buffer(vb_desc, &app_data->gui_vb, context)) return false;
+
+        dm_mat_ortho(0,(float)context->renderer.width, (float)context->renderer.height,0, -1,1, app_data->gui_proj);
+#ifdef DM_DIRECTX12
+        dm_mat4_transpose(app_data->gui_proj, app_data->gui_proj);
+#endif
+
+        dm_constant_buffer_desc cb_desc = { 0 };
+        cb_desc.size = sizeof(dm_mat4);
+        cb_desc.data = app_data->gui_proj;
+
+        if(!dm_renderer_create_constant_buffer(cb_desc, &app_data->gui_cb, context)) return false;
+
         dm_raster_pipeline_desc desc = { 0 };
 
         dm_input_element_desc* input = desc.input_assembler.input_elements;
@@ -264,6 +217,21 @@ bool dm_application_init(dm_context* context)
 
         desc.viewport.type = DM_VIEWPORT_TYPE_DEFAULT;
         desc.scissor.type  = DM_SCISSOR_TYPE_DEFAULT;
+
+        // descriptors
+        desc.descriptor_group[0].ranges[0].type       = DM_DESCRIPTOR_RANGE_TYPE_CONSTANT_BUFFER;
+        desc.descriptor_group[0].ranges[0].count      = 1;
+        desc.descriptor_group[0].flags                = DM_DESCRIPTOR_GROUP_FLAG_VERTEX_SHADER;
+
+        desc.descriptor_group[0].range_count = 1;
+
+        desc.descriptor_group[1].ranges[0].type       = DM_DESCRIPTOR_RANGE_TYPE_TEXTURE;
+        desc.descriptor_group[1].ranges[0].count      = 1;
+        desc.descriptor_group[1].flags                = DM_DESCRIPTOR_GROUP_FLAG_PIXEL_SHADER;
+
+        desc.descriptor_group[1].range_count = 1;
+
+        desc.descriptor_group_count = 2;
 
         if(!dm_renderer_create_raster_pipeline(desc, &app_data->gui_pipe, context)) return false;
     }
@@ -339,6 +307,44 @@ bool dm_application_update(dm_context* context)
     dm_mat4_transpose(app_data->mvp, app_data->mvp);
 #endif
 
+    // gui
+    const float width  = 400.f;
+    const float height = 700.f;
+
+    // test rect
+
+    app_data->gui_vertices[0].pos[0]   = 100.f;
+    app_data->gui_vertices[0].pos[1]   = 100.f;
+    app_data->gui_vertices[0].color[0] = 1.f;
+    app_data->gui_vertices[0].color[3] = 1.f;
+
+    app_data->gui_vertices[1].pos[0]   = 100.f;
+    app_data->gui_vertices[1].pos[1]   = 100.f + height;
+    app_data->gui_vertices[1].color[0] = 1.f;
+    app_data->gui_vertices[1].color[3] = 1.f;
+
+    app_data->gui_vertices[2].pos[0]   = 100.f + width;
+    app_data->gui_vertices[2].pos[1]   = 100.f;
+    app_data->gui_vertices[2].color[0] = 1.f;
+    app_data->gui_vertices[2].color[3] = 1.f;
+
+    app_data->gui_vertices[3].pos[0]   = 100.f + width;
+    app_data->gui_vertices[3].pos[1]   = 100.f;
+    app_data->gui_vertices[3].color[0] = 1.f;
+    app_data->gui_vertices[3].color[3] = 1.f;
+
+    app_data->gui_vertices[4].pos[0]   = 100.f;
+    app_data->gui_vertices[4].pos[1]   = 100.f + height;
+    app_data->gui_vertices[4].color[0] = 1.f;
+    app_data->gui_vertices[4].color[3] = 1.f;
+
+    app_data->gui_vertices[5].pos[0]   = 100.f + width;
+    app_data->gui_vertices[5].pos[1]   = 100.f + height;
+    app_data->gui_vertices[5].color[0] = 1.f;
+    app_data->gui_vertices[5].color[3] = 1.f;
+
+    app_data->gui_vertex_count = 6;
+
     return true;
 }
 
@@ -350,6 +356,7 @@ bool dm_application_render(dm_context* context)
     dm_render_command_update_constant_buffer(app_data->mvp, sizeof(dm_mat4), app_data->cb, context);
 
     dm_render_command_bind_raster_pipeline(app_data->raster_pipe, context);
+    dm_render_command_bind_constant_buffer(app_data->cb, 0, context);
     dm_render_command_bind_descriptor_group(app_data->raster_pipe, 0, context);
 
     dm_render_command_bind_vertex_buffer(app_data->vb, context);
@@ -358,7 +365,18 @@ bool dm_application_render(dm_context* context)
     dm_render_command_draw_instanced_indexed(1,0, _countof(cube_indices),0, 0, context);
 
     // gui rendering
+    dm_render_command_update_vertex_buffer(app_data->gui_vertices, sizeof(app_data->gui_vertices), app_data->gui_vb, context);
+
     dm_render_command_bind_raster_pipeline(app_data->gui_pipe, context);
+    dm_render_command_bind_constant_buffer(app_data->gui_cb, 0, context);
+    dm_render_command_bind_texture(app_data->gui_font.texture_handle, 0, context);
+    dm_render_command_bind_descriptor_group(app_data->gui_pipe, 0, context);
+
+    dm_render_command_bind_vertex_buffer(app_data->gui_vb, context);
+
+    dm_render_command_draw_instanced(1,0, app_data->gui_vertex_count,0, context);
+
+    app_data->gui_vertex_count = 0;
 
     return true;
 }

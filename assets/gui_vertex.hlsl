@@ -12,11 +12,17 @@ struct VS_OUTPUT
     float4 color : COLOR1;
 };
 
+cbuffer ConstantBuffer : register(b0)
+{
+    matrix proj;
+};
+
 VS_OUTPUT main(VS_INPUT input)
 {
     VS_OUTPUT output;
 
     output.pos   = float4(input.pos, 0, 1.f);
+    output.pos   = mul(output.pos, proj);
     output.uv    = input.uv;
     output.color = input.color;
 
