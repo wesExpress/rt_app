@@ -1,6 +1,8 @@
 #include "dm.h"
 #include "data.h"
 
+#include <stdio.h>
+
 typedef struct gui_vertex_t
 {
     float pos[2];
@@ -8,7 +10,7 @@ typedef struct gui_vertex_t
     float color[4];
 } gui_vertex;
 
-#define MAX_GUI_VERTICES 100
+#define MAX_GUI_VERTICES 1000
 
 typedef struct simple_camera_t
 {
@@ -27,6 +29,8 @@ typedef struct application_data_t
 
     gui_vertex gui_vertices[MAX_GUI_VERTICES];
     uint32_t   gui_vertex_count;
+    char       fps_text[512];
+    char       frame_time_text[512];
 
     simple_camera camera;
     dm_mat4       model;
@@ -36,9 +40,71 @@ typedef struct application_data_t
 
     dm_mat4 gui_proj;
 
-    dm_timer frame_timer;
+    dm_timer frame_timer, fps_timer;
     uint16_t frame_count;
 } application_data;
+
+void gui_draw_text(float x, float y, const char* input_text, dm_font font, gui_vertex* vertices, uint32_t* vertex_count)
+{
+    const char* text   = input_text;
+    const char* runner = input_text;
+    float text_len = 0.f;
+    float max_h    = 0.f;
+
+    uint32_t num_glyphs = 0;
+    float xf = x;
+    float yf = y;
+    while(*runner)
+    {
+        if(*runner >= 32 && *runner <= 127)
+        {
+            dm_font_aligned_quad quad = dm_font_get_aligned_quad(font, *runner, &xf,&yf);
+
+            text_len += quad.x1 - quad.x0;
+            max_h = DM_MAX(max_h, (quad.y1 - quad.y0));
+            num_glyphs++;
+        }
+        runner++;
+    }
+    num_glyphs *= 6;
+
+    xf = x;
+    yf = y;
+    uint32_t count = *vertex_count;
+
+    while(*text)
+    {
+        if(*text >= 32 && *text <= 127)
+        {
+            dm_font_aligned_quad quad = dm_font_get_aligned_quad(font, *text, &xf,&yf);
+
+            gui_vertex v0 = {
+                { quad.x0,quad.y0 }, { quad.s0,quad.t0 }, { 1.f,1.f,1.f,1.f }
+            };
+            gui_vertex v1 = {
+                { quad.x1,quad.y0 }, { quad.s1,quad.t0 }, { 1.f,1.f,1.f,1.f }
+            };
+            gui_vertex v2 = {
+                { quad.x1,quad.y1 }, { quad.s1,quad.t1 }, { 1.f,1.f,1.f,1.f }
+            };
+            gui_vertex v3 = {
+                { quad.x0,quad.y1 }, { quad.s0,quad.t1 }, { 1.f,1.f,1.f,1.f }
+            };
+
+            vertices[count++] = v0;
+            vertices[count++] = v2;
+            vertices[count++] = v1;
+
+            vertices[count++] = v0;
+            vertices[count++] = v3;
+            vertices[count++] = v2;
+        }
+
+        text++;
+    }
+
+    *vertex_count = count;
+}
 
 void dm_application_setup(dm_context_init_packet* init_packet)
 {
@@ -149,6 +215,7 @@ bool dm_application_init(dm_context* context)
 
     // misc
     dm_timer_start(&app_data->frame_timer, context);
+    dm_timer_start(&app_data->fps_timer, context);
 
     dm_mat4_identity(app_data->model);
     app_data->axis[0] = 1.f;
@@ -247,11 +314,15 @@ bool dm_application_update(dm_context* context)
 {
     application_data* app_data = context->app_data;
 
-    if(dm_timer_elapsed(&app_data->frame_timer, context) >= 1)
+    double frame_time = dm_timer_elapsed_ms(&app_data->frame_timer, context);
+    sprintf(app_data->frame_time_text, "Frame time: %0.2lf ms", frame_time);
+    dm_timer_start(&app_data->frame_timer, context);
+
+    if(dm_timer_elapsed(&app_data->fps_timer, context) >= 1)
     {
-        DM_LOG_INFO("FPS: %u", app_data->frame_count);
+        sprintf(app_data->fps_text, "FPS: %u", app_data->frame_count);
         app_data->frame_count = 0;
-        dm_timer_start(&app_data->frame_timer, context);
+        dm_timer_start(&app_data->fps_timer, context);
     }
     else
     {
@@ -291,7 +362,7 @@ bool dm_application_update(dm_context* context)
 
     // model matrix
     app_data->angle += 45.f * context->delta;
-    if(app_data->angle > 365.f) app_data->angle -= 365.f;
+    if(app_data->angle > 360.f) app_data->angle -= 360.f;
 
     dm_quat orientation;
     dm_quat_from_axis_angle_deg(app_data->axis, app_data->angle, orientation);
@@ -308,65 +379,8 @@ bool dm_application_update(dm_context* context)
 #endif
 
     // gui
-    const float width  = 400.f;
-    const float height = 700.f;
-
-    // test rect
-
-    const char* text = "Hello world";
-    const char* runner = text;
-    float text_len = 0.f;
-    float max_h    = 0.f;
-
-    uint32_t num_glyphs = 0;
-    float xf = 100.f;
-    float yf = 100.f;
-    while(*runner)
-    {
-        if(*runner >= 32 && *runner <= 127)
-        {
-            dm_font_aligned_quad quad = dm_font_get_aligned_quad(app_data->gui_font, *runner, &xf,&yf);
-
-            text_len += quad.x1 - quad.x0;
-            max_h = DM_MAX(max_h, (quad.y1 - quad.y0));
-            num_glyphs++;
-        }
-        runner++;
-    }
-    num_glyphs *= 6;
-
-    xf = 100.f;
-    yf = 100.f;
-    while(*text)
-    {
-        if(*text >= 32 && *text <= 127)
-        {
-            dm_font_aligned_quad quad = dm_font_get_aligned_quad(app_data->gui_font, *text, &xf,&yf);
-
-            gui_vertex v0 = {
-                { quad.x0,quad.y0 }, { quad.s0,quad.t0 }, { 1.f,0.f,0.f,1.f }
-            };
-            gui_vertex v1 = {
-                { quad.x1,quad.y0 }, { quad.s1,quad.t0 }, { 1.f,0.f,0.f,1.f }
-            };
-            gui_vertex v2 = {
-                { quad.x1,quad.y1 }, { quad.s1,quad.t1 }, { 1.f,0.f,0.f,1.f }
-            };
-            gui_vertex v3 = {
-                { quad.x0,quad.y1 }, { quad.s0,quad.t1 }, { 1.f,0.f,0.f,1.f }
-            };
-
-            app_data->gui_vertices[app_data->gui_vertex_count++] = v0;
-            app_data->gui_vertices[app_data->gui_vertex_count++] = v2;
-            app_data->gui_vertices[app_data->gui_vertex_count++] = v1;
-
-            app_data->gui_vertices[app_data->gui_vertex_count++] = v0;
-            app_data->gui_vertices[app_data->gui_vertex_count++] = v3;
-            app_data->gui_vertices[app_data->gui_vertex_count++] = v2;
-        }
-
-        text++;
-    }
+    gui_draw_text(100.f,100.f, app_data->fps_text,        app_data->gui_font, app_data->gui_vertices, &app_data->gui_vertex_count);
+    gui_draw_text(100.f,150.f, app_data->frame_time_text, app_data->gui_font, app_data->gui_vertices, &app_data->gui_vertex_count);
 
     return true;
 }
