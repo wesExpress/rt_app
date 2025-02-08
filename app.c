@@ -158,7 +158,7 @@ bool dm_application_init(dm_context* context)
 
     // gui
     {
-        if(!dm_renderer_load_font("assets/JetBrainsMono-Regular.ttf", 16, &app_data->gui_font, context)) return false;
+        if(!dm_renderer_load_font("assets/JetBrainsMono-Regular.ttf", 32, &app_data->gui_font, context)) return false;
 
         dm_vertex_buffer_desc vb_desc = { 0 };
         vb_desc.stride       = sizeof(gui_vertex);
@@ -313,37 +313,60 @@ bool dm_application_update(dm_context* context)
 
     // test rect
 
-    app_data->gui_vertices[0].pos[0]   = 100.f;
-    app_data->gui_vertices[0].pos[1]   = 100.f;
-    app_data->gui_vertices[0].color[0] = 1.f;
-    app_data->gui_vertices[0].color[3] = 1.f;
+    const char* text = "Hello world";
+    const char* runner = text;
+    float text_len = 0.f;
+    float max_h    = 0.f;
 
-    app_data->gui_vertices[1].pos[0]   = 100.f;
-    app_data->gui_vertices[1].pos[1]   = 100.f + height;
-    app_data->gui_vertices[1].color[0] = 1.f;
-    app_data->gui_vertices[1].color[3] = 1.f;
+    uint32_t num_glyphs = 0;
+    float xf = 100.f;
+    float yf = 100.f;
+    while(*runner)
+    {
+        if(*runner >= 32 && *runner <= 127)
+        {
+            dm_font_aligned_quad quad = dm_font_get_aligned_quad(app_data->gui_font, *runner, &xf,&yf);
 
-    app_data->gui_vertices[2].pos[0]   = 100.f + width;
-    app_data->gui_vertices[2].pos[1]   = 100.f;
-    app_data->gui_vertices[2].color[0] = 1.f;
-    app_data->gui_vertices[2].color[3] = 1.f;
+            text_len += quad.x1 - quad.x0;
+            max_h = DM_MAX(max_h, (quad.y1 - quad.y0));
+            num_glyphs++;
+        }
+        runner++;
+    }
+    num_glyphs *= 6;
 
-    app_data->gui_vertices[3].pos[0]   = 100.f + width;
-    app_data->gui_vertices[3].pos[1]   = 100.f;
-    app_data->gui_vertices[3].color[0] = 1.f;
-    app_data->gui_vertices[3].color[3] = 1.f;
+    xf = 100.f;
+    yf = 100.f;
+    while(*text)
+    {
+        if(*text >= 32 && *text <= 127)
+        {
+            dm_font_aligned_quad quad = dm_font_get_aligned_quad(app_data->gui_font, *text, &xf,&yf);
 
-    app_data->gui_vertices[4].pos[0]   = 100.f;
-    app_data->gui_vertices[4].pos[1]   = 100.f + height;
-    app_data->gui_vertices[4].color[0] = 1.f;
-    app_data->gui_vertices[4].color[3] = 1.f;
+            gui_vertex v0 = {
+                { quad.x0,quad.y0 }, { quad.s0,quad.t0 }, { 1.f,0.f,0.f,1.f }
+            };
+            gui_vertex v1 = {
+                { quad.x1,quad.y0 }, { quad.s1,quad.t0 }, { 1.f,0.f,0.f,1.f }
+            };
+            gui_vertex v2 = {
+                { quad.x1,quad.y1 }, { quad.s1,quad.t1 }, { 1.f,0.f,0.f,1.f }
+            };
+            gui_vertex v3 = {
+                { quad.x0,quad.y1 }, { quad.s0,quad.t1 }, { 1.f,0.f,0.f,1.f }
+            };
 
-    app_data->gui_vertices[5].pos[0]   = 100.f + width;
-    app_data->gui_vertices[5].pos[1]   = 100.f + height;
-    app_data->gui_vertices[5].color[0] = 1.f;
-    app_data->gui_vertices[5].color[3] = 1.f;
+            app_data->gui_vertices[app_data->gui_vertex_count++] = v0;
+            app_data->gui_vertices[app_data->gui_vertex_count++] = v2;
+            app_data->gui_vertices[app_data->gui_vertex_count++] = v1;
 
-    app_data->gui_vertex_count = 6;
+            app_data->gui_vertices[app_data->gui_vertex_count++] = v0;
+            app_data->gui_vertices[app_data->gui_vertex_count++] = v3;
+            app_data->gui_vertices[app_data->gui_vertex_count++] = v2;
+        }
+
+        text++;
+    }
 
     return true;
 }
@@ -371,6 +394,7 @@ bool dm_application_render(dm_context* context)
     dm_render_command_bind_constant_buffer(app_data->gui_cb, 0, context);
     dm_render_command_bind_texture(app_data->gui_font.texture_handle, 0, context);
     dm_render_command_bind_descriptor_group(app_data->gui_pipe, 0, context);
+    dm_render_command_bind_descriptor_group(app_data->gui_pipe, 1, context);
 
     dm_render_command_bind_vertex_buffer(app_data->gui_vb, context);
 
