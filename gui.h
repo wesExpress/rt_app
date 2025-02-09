@@ -37,7 +37,23 @@ typedef struct gui_data_s_t
     uint32_t   quad_count;
 } gui_data_s;
 
-void gui_draw_quad(float x, float y, float w, float h, float r, float g, float b, float a, gui_quad_vertex* vertices, uint32_t* vertex_count);
-void gui_draw_text(float x, float y, const char* input_text, gui_font* font);
+typedef struct gui_style_t
+{
+    uint8_t text_padding_l, text_padding_r;
+    uint8_t text_padding_t, text_padding_b;
+    uint8_t window_border_w, window_border_h;
+
+    float window_border_color[4];
+    float window_color[4];
+} gui_style;
+
+bool gui_init(gui_style style, void** gui_ctxt, dm_context* context);
+
+bool gui_load_font(const char* path, uint8_t font_size, uint8_t* font_index, void* gui_ctxt, dm_context* context);
+
+void gui_draw_quad(float x, float y, float w, float h, float r, float g, float b, float a, void* context);
+void gui_draw_text(float x, float y, const char* input_text, float r, float g, float b, float a, uint8_t font_index, void* context);
+
+void gui_render(void* gui_ctxt, dm_context* context);
 
 #endif

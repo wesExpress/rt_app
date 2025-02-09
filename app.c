@@ -15,7 +15,8 @@ typedef struct application_data_t
     dm_render_handle raster_pipe;
     dm_render_handle vb, ib, cb;
 
-    gui_data_s gui_data;
+    void* gui_context;
+    uint8_t font16, font32;
 
     char       fps_text[512];
     char       frame_time_text[512];
@@ -31,7 +32,6 @@ typedef struct application_data_t
     dm_timer frame_timer, fps_timer;
     uint16_t frame_count;
 } application_data;
-
 
 void dm_application_setup(dm_context_init_packet* init_packet)
 {
@@ -152,135 +152,10 @@ bool dm_application_init(dm_context* context)
 
     // gui
     {
-        if(!dm_renderer_load_font("assets/JetBrainsMono-Regular.ttf", 16, &app_data->gui_data.font16.font, context)) return false;
-        if(!dm_renderer_load_font("assets/JetBrainsMono-Regular.ttf", 32, &app_data->gui_data.font32.font, context)) return false;
+        if(!gui_init((gui_style){ 0 }, &app_data->gui_context, context)) return false;
 
-        dm_vertex_buffer_desc vb_desc = { 0 };
-        vb_desc.stride       = sizeof(gui_text_vertex);
-        vb_desc.element_size = sizeof(float);
-        vb_desc.size         = sizeof(gui_text_vertex) * MAX_GUI_VERTICES;
-        vb_desc.data         = NULL;
-        if(!dm_renderer_create_vertex_buffer(vb_desc, &app_data->gui_data.font16.vb, context)) return false;
-        if(!dm_renderer_create_vertex_buffer(vb_desc, &app_data->gui_data.font32.vb, context)) return false;
-
-        vb_desc.stride = sizeof(gui_quad_vertex);
-        vb_desc.size   = sizeof(gui_quad_vertex) * MAX_GUI_VERTICES;
-        if(!dm_renderer_create_vertex_buffer(vb_desc, &app_data->gui_data.quad_vb, context)) return false;
-
-        dm_mat_ortho(0,(float)context->renderer.width, (float)context->renderer.height,0, -1,1, app_data->gui_proj);
-#ifdef DM_DIRECTX12
-        dm_mat4_transpose(app_data->gui_proj, app_data->gui_proj);
-#endif
-
-        dm_constant_buffer_desc cb_desc = { 0 };
-        cb_desc.size = sizeof(dm_mat4);
-        cb_desc.data = app_data->gui_proj;
-
-        if(!dm_renderer_create_constant_buffer(cb_desc, &app_data->gui_data.cb, context)) return false;
-    }
-
-    // quad pipeline
-    {
-        dm_raster_pipeline_desc desc = { 0 };
-
-        dm_input_element_desc* input = desc.input_assembler.input_elements;
-        dm_strcpy(input->name, "POSITION");
-        input->format = DM_INPUT_ELEMENT_FORMAT_FLOAT_2;
-        input->class  = DM_INPUT_ELEMENT_CLASS_PER_VERTEX;
-        input->stride = sizeof(gui_quad_vertex);
-        input->offset = offsetof(gui_quad_vertex, pos);
-
-        input++;
-
-        dm_strcpy(input->name, "COLOR");
-        input->format = DM_INPUT_ELEMENT_FORMAT_FLOAT_4;
-        input->class  = DM_INPUT_ELEMENT_CLASS_PER_VERTEX;
-        input->stride = sizeof(gui_quad_vertex);
-        input->offset = offsetof(gui_quad_vertex, color);
-
-        desc.input_assembler.topology = DM_INPUT_TOPOLOGY_TRIANGLE_LIST;
-
-        desc.input_assembler.input_element_count = 2;
-
-        // rasterizer
-        desc.rasterizer.cull_mode    = DM_RASTERIZER_CULL_MODE_BACK;
-        desc.rasterizer.polygon_fill = DM_RASTERIZER_POLYGON_FILL_FILL;
-        desc.rasterizer.front_face   = DM_RASTERIZER_FRONT_FACE_COUNTER_CLOCKWISE;
-        dm_strcpy(desc.rasterizer.vertex_shader_desc.path, "assets/quad_vertex.cso");
-        dm_strcpy(desc.rasterizer.pixel_shader_desc.path,  "assets/quad_pixel.cso");
-
-        desc.viewport.type = DM_VIEWPORT_TYPE_DEFAULT;
-        desc.scissor.type  = DM_SCISSOR_TYPE_DEFAULT;
-
-        // descriptors
-        desc.descriptor_group[0].ranges[0].type       = DM_DESCRIPTOR_RANGE_TYPE_CONSTANT_BUFFER;
-        desc.descriptor_group[0].ranges[0].count      = 1;
-        desc.descriptor_group[0].flags                = DM_DESCRIPTOR_GROUP_FLAG_VERTEX_SHADER;
-
-        desc.descriptor_group[0].range_count = 1;
-
-        desc.descriptor_group_count = 1;
-
-        if(!dm_renderer_create_raster_pipeline(desc, &app_data->gui_data.quad_pipe, context)) return false;
-    }
-
-    // text pipeline
-    {
-        dm_raster_pipeline_desc desc = { 0 };
-
-        dm_input_element_desc* input = desc.input_assembler.input_elements;
-        dm_strcpy(input->name, "POSITION");
-        input->format = DM_INPUT_ELEMENT_FORMAT_FLOAT_2;
-        input->class  = DM_INPUT_ELEMENT_CLASS_PER_VERTEX;
-        input->stride = sizeof(gui_text_vertex);
-        input->offset = offsetof(gui_text_vertex, pos);
-
-        input++;
-
-        dm_strcpy(input->name, "TEX_COORDS");
-        input->format = DM_INPUT_ELEMENT_FORMAT_FLOAT_2;
-        input->class  = DM_INPUT_ELEMENT_CLASS_PER_VERTEX;
-        input->stride = sizeof(gui_text_vertex);
-        input->offset = offsetof(gui_text_vertex, pos);
-
-        input++;
-
-        dm_strcpy(input->name, "COLOR");
-        input->format = DM_INPUT_ELEMENT_FORMAT_FLOAT_4;
-        input->class  = DM_INPUT_ELEMENT_CLASS_PER_VERTEX;
-        input->stride = sizeof(gui_text_vertex);
-        input->offset = offsetof(gui_text_vertex, color);
-
-        desc.input_assembler.topology = DM_INPUT_TOPOLOGY_TRIANGLE_LIST;
-
-        desc.input_assembler.input_element_count = 3;
-
-        // rasterizer
-        desc.rasterizer.cull_mode    = DM_RASTERIZER_CULL_MODE_BACK;
-        desc.rasterizer.polygon_fill = DM_RASTERIZER_POLYGON_FILL_FILL;
-        desc.rasterizer.front_face   = DM_RASTERIZER_FRONT_FACE_COUNTER_CLOCKWISE;
-        dm_strcpy(desc.rasterizer.vertex_shader_desc.path, "assets/gui_vertex.cso");
-        dm_strcpy(desc.rasterizer.pixel_shader_desc.path,  "assets/gui_pixel.cso");
-
-        desc.viewport.type = DM_VIEWPORT_TYPE_DEFAULT;
-        desc.scissor.type  = DM_SCISSOR_TYPE_DEFAULT;
-
-        // descriptors
-        desc.descriptor_group[0].ranges[0].type       = DM_DESCRIPTOR_RANGE_TYPE_CONSTANT_BUFFER;
-        desc.descriptor_group[0].ranges[0].count      = 1;
-        desc.descriptor_group[0].flags                = DM_DESCRIPTOR_GROUP_FLAG_VERTEX_SHADER;
-
-        desc.descriptor_group[0].range_count = 1;
-
-        desc.descriptor_group[1].ranges[0].type       = DM_DESCRIPTOR_RANGE_TYPE_TEXTURE;
-        desc.descriptor_group[1].ranges[0].count      = 1;
-        desc.descriptor_group[1].flags                = DM_DESCRIPTOR_GROUP_FLAG_PIXEL_SHADER;
-
-        desc.descriptor_group[1].range_count = 1;
-
-        desc.descriptor_group_count = 2;
-
-        if(!dm_renderer_create_raster_pipeline(desc, &app_data->gui_data.text_pipe, context)) return false;
+        if(!gui_load_font("assets/JetBrainsMono-Regular.ttf", 16, &app_data->font16, app_data->gui_context, context)) return false;
+        if(!gui_load_font("assets/JetBrainsMono-Regular.ttf", 32, &app_data->font32, app_data->gui_context, context)) return false;
     }
 
     return true;
@@ -288,6 +163,9 @@ bool dm_application_init(dm_context* context)
 
 void dm_application_shutdown(dm_context* context)
 {
+    application_data* app_data = context->app_data;
+
+    dm_free(&app_data->gui_context);
 }
 
 bool dm_application_update(dm_context* context)
@@ -359,10 +237,10 @@ bool dm_application_update(dm_context* context)
 #endif
 
     // gui
-    gui_draw_quad(100.f,100.f, 500.f,200.f, 0.1f,0.1f,0.7f,1.f, app_data->gui_data.quad_vertices, &app_data->gui_data.quad_count);
+    gui_draw_quad(100.f,100.f, 500.f,200.f, 0.1f,0.1f,0.7f,1.f, app_data->gui_context);
 
-    gui_draw_text(110.f,110.f, app_data->fps_text,        &app_data->gui_data.font16);
-    gui_draw_text(110.f,160.f, app_data->frame_time_text, &app_data->gui_data.font32);
+    gui_draw_text(110.f,110.f, app_data->fps_text,        1.f,1.f,1.f,1.f, app_data->font16, app_data->gui_context);
+    gui_draw_text(110.f,160.f, app_data->frame_time_text, 1.f,1.f,1.f,1.f, app_data->font32, app_data->gui_context);
 
     return true;
 }
@@ -372,55 +250,21 @@ bool dm_application_render(dm_context* context)
     application_data* app_data = context->app_data;
 
     // object rendering
-    dm_render_command_update_constant_buffer(app_data->mvp, sizeof(dm_mat4), app_data->cb, context);
-
-    dm_render_command_bind_raster_pipeline(app_data->raster_pipe, context);
-    dm_render_command_bind_constant_buffer(app_data->cb, 0, context);
-    dm_render_command_bind_descriptor_group(0, 1, context);
-
-    dm_render_command_bind_vertex_buffer(app_data->vb, context);
-    dm_render_command_bind_index_buffer(app_data->ib, context);
-
-    dm_render_command_draw_instanced_indexed(1,0, _countof(cube_indices),0, 0, context);
-
-    // gui rendering
-    // quads
     {
-        dm_render_command_update_vertex_buffer(app_data->gui_data.quad_vertices, sizeof(app_data->gui_data.quad_vertices), app_data->gui_data.quad_vb, context);
+        dm_render_command_update_constant_buffer(app_data->mvp, sizeof(dm_mat4), app_data->cb, context);
 
-        dm_render_command_bind_raster_pipeline(app_data->gui_data.quad_pipe, context);
-        dm_render_command_bind_constant_buffer(app_data->gui_data.cb, 0, context);
+        dm_render_command_bind_raster_pipeline(app_data->raster_pipe, context);
+        dm_render_command_bind_constant_buffer(app_data->cb, 0, context);
         dm_render_command_bind_descriptor_group(0, 1, context);
 
-        dm_render_command_bind_vertex_buffer(app_data->gui_data.quad_vb, context);
-        dm_render_command_draw_instanced(1,0, app_data->gui_data.quad_count,0, context);
+        dm_render_command_bind_vertex_buffer(app_data->vb, context);
+        dm_render_command_bind_index_buffer(app_data->ib, context);
+
+        dm_render_command_draw_instanced_indexed(1,0, _countof(cube_indices),0, 0, context);
     }
 
-    // text 16
-    dm_render_command_bind_raster_pipeline(app_data->gui_data.text_pipe, context);
-    dm_render_command_bind_constant_buffer(app_data->gui_data.cb, 0, context);
-    dm_render_command_bind_descriptor_group(0, 1, context);
-    
-    {
-        dm_render_command_update_vertex_buffer(app_data->gui_data.font16.vertices, sizeof(app_data->gui_data.font16.vertices), app_data->gui_data.font16.vb, context);
-        dm_render_command_bind_vertex_buffer(app_data->gui_data.font16.vb, context);
-        dm_render_command_bind_texture(app_data->gui_data.font16.font.texture_handle, 0, context);
-        dm_render_command_bind_descriptor_group(1, 1, context);
-        dm_render_command_draw_instanced(1,0, app_data->gui_data.font16.count,0, context);
-    }
-
-    // text 32 
-    {
-        dm_render_command_update_vertex_buffer(app_data->gui_data.font32.vertices, sizeof(app_data->gui_data.font32.vertices), app_data->gui_data.font32.vb, context);
-        dm_render_command_bind_vertex_buffer(app_data->gui_data.font32.vb, context);
-        dm_render_command_bind_texture(app_data->gui_data.font32.font.texture_handle, 0, context);
-        dm_render_command_bind_descriptor_group(1, 1, context);
-        dm_render_command_draw_instanced(1,0, app_data->gui_data.font32.count,0, context);
-    }
-
-    app_data->gui_data.quad_count = 0;
-    app_data->gui_data.font16.count = 0;
-    app_data->gui_data.font32.count = 0;
+    // gui 
+    gui_render(app_data->gui_context, context);
 
     return true;
 }
