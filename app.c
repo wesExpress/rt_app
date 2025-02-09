@@ -1,40 +1,14 @@
 #include "dm.h"
 #include "data.h"
+#include "gui.h"
 
 #include <stdio.h>
-
-typedef struct gui_quad_vertex_t
-{
-    float pos[2];
-    float color[4];
-} gui_quad_vertex;
-
-typedef struct gui_text_vertex_t
-{
-    float pos[2];
-    float uv[2];
-    float color[4];
-} gui_text_vertex;
-
-#define MAX_GUI_VERTICES 1000
 
 typedef struct simple_camera_t
 {
     dm_vec3 pos, forward, up;
     dm_mat4 view, proj;
 } simple_camera;
-
-typedef struct gui_data_s_t
-{
-    dm_render_handle quad_vb, text_vb, cb;
-    dm_render_handle quad_pipe, text_pipe;
-    dm_font          font;
-
-    gui_quad_vertex quad_vertices[MAX_GUI_VERTICES];
-    gui_text_vertex text_vertices[MAX_GUI_VERTICES];
-
-    uint32_t   quad_count, text_count;
-} gui_data_s;
 
 typedef struct application_data_t
 {
@@ -58,95 +32,6 @@ typedef struct application_data_t
     uint16_t frame_count;
 } application_data;
 
-void gui_draw_quad(float x, float y, float w, float h, float r, float g, float b, float a, gui_quad_vertex* vertices, uint32_t* vertex_count)
-{
-    gui_quad_vertex v0 = {
-        { x, y }, { r,g,b,a }
-    };
-    gui_quad_vertex v1 = {
-        { x + w, y }, { r,g,b,a }
-    };
-    gui_quad_vertex v2 = { 
-        { x + w, y + h}, { r,g,b,a }
-    };
-    gui_quad_vertex v3 = { 
-        { x, y + h }, { r,g,b,a }
-    };
-
-    uint32_t count = *vertex_count;
-
-    vertices[count++] = v0;
-    vertices[count++] = v2;
-    vertices[count++] = v1;
-
-    vertices[count++] = v0;
-    vertices[count++] = v3;
-    vertices[count++] = v2;
-
-    *vertex_count = count;
-}
-
-void gui_draw_text(float x, float y, const char* input_text, dm_font font, gui_text_vertex* vertices, uint32_t* vertex_count)
-{
-    const char* text   = input_text;
-    const char* runner = input_text;
-    float text_len = 0.f;
-    float max_h    = 0.f;
-
-    uint32_t num_glyphs = 0;
-    float xf = x;
-    float yf = y;
-    while(*runner)
-    {
-        if(*runner >= 32 && *runner <= 127)
-        {
-            dm_font_aligned_quad quad = dm_font_get_aligned_quad(font, *runner, &xf,&yf);
-
-            text_len += quad.x1 - quad.x0;
-            max_h = DM_MAX(max_h, (quad.y1 - quad.y0));
-            num_glyphs++;
-        }
-        runner++;
-    }
-    num_glyphs *= 6;
-
-    xf = x;
-    yf = y;
-    uint32_t count = *vertex_count;
-
-    while(*text)
-    {
-        if(*text >= 32 && *text <= 127)
-        {
-            dm_font_aligned_quad quad = dm_font_get_aligned_quad(font, *text, &xf,&yf);
-
-            gui_text_vertex v0 = {
-                { quad.x0,quad.y0+max_h }, { quad.s0,quad.t0 }, { 1.f,1.f,1.f,1.f }
-            };
-            gui_text_vertex v1 = {
-                { quad.x1,quad.y0+max_h }, { quad.s1,quad.t0 }, { 1.f,1.f,1.f,1.f }
-            };
-            gui_text_vertex v2 = {
-                { quad.x1,quad.y1+max_h }, { quad.s1,quad.t1 }, { 1.f,1.f,1.f,1.f }
-            };
-            gui_text_vertex v3 = {
-                { quad.x0,quad.y1+max_h }, { quad.s0,quad.t1 }, { 1.f,1.f,1.f,1.f }
-            };
-
-            vertices[count++] = v0;
-            vertices[count++] = v2;
-            vertices[count++] = v1;
-
-            vertices[count++] = v0;
-            vertices[count++] = v3;
-            vertices[count++] = v2;
-        }
-
-        text++;
-    }
-
-    *vertex_count = count;
-}
 
 void dm_application_setup(dm_context_init_packet* init_packet)
 {
@@ -267,14 +152,16 @@ bool dm_application_init(dm_context* context)
 
     // gui
     {
-        if(!dm_renderer_load_font("assets/JetBrainsMono-Regular.ttf", 32, &app_data->gui_data.font, context)) return false;
+        if(!dm_renderer_load_font("assets/JetBrainsMono-Regular.ttf", 16, &app_data->gui_data.font16.font, context)) return false;
+        if(!dm_renderer_load_font("assets/JetBrainsMono-Regular.ttf", 32, &app_data->gui_data.font32.font, context)) return false;
 
         dm_vertex_buffer_desc vb_desc = { 0 };
         vb_desc.stride       = sizeof(gui_text_vertex);
         vb_desc.element_size = sizeof(float);
         vb_desc.size         = sizeof(gui_text_vertex) * MAX_GUI_VERTICES;
         vb_desc.data         = NULL;
-        if(!dm_renderer_create_vertex_buffer(vb_desc, &app_data->gui_data.text_vb, context)) return false;
+        if(!dm_renderer_create_vertex_buffer(vb_desc, &app_data->gui_data.font16.vb, context)) return false;
+        if(!dm_renderer_create_vertex_buffer(vb_desc, &app_data->gui_data.font32.vb, context)) return false;
 
         vb_desc.stride = sizeof(gui_quad_vertex);
         vb_desc.size   = sizeof(gui_quad_vertex) * MAX_GUI_VERTICES;
@@ -472,10 +359,10 @@ bool dm_application_update(dm_context* context)
 #endif
 
     // gui
-    gui_draw_quad(100.f,100.f, 500.f,500.f, 0.1f,0.1f,0.7f,1.f, app_data->gui_data.quad_vertices, &app_data->gui_data.quad_count);
+    gui_draw_quad(100.f,100.f, 500.f,200.f, 0.1f,0.1f,0.7f,1.f, app_data->gui_data.quad_vertices, &app_data->gui_data.quad_count);
 
-    gui_draw_text(110.f,110.f, app_data->fps_text,        app_data->gui_data.font, app_data->gui_data.text_vertices, &app_data->gui_data.text_count);
-    gui_draw_text(110.f,160.f, app_data->frame_time_text, app_data->gui_data.font, app_data->gui_data.text_vertices, &app_data->gui_data.text_count);
+    gui_draw_text(110.f,110.f, app_data->fps_text,        &app_data->gui_data.font16);
+    gui_draw_text(110.f,160.f, app_data->frame_time_text, &app_data->gui_data.font32);
 
     return true;
 }
@@ -489,6 +376,7 @@ bool dm_application_render(dm_context* context)
 
     dm_render_command_bind_raster_pipeline(app_data->raster_pipe, context);
     dm_render_command_bind_constant_buffer(app_data->cb, 0, context);
+    dm_render_command_bind_descriptor_group(0, 1, context);
 
     dm_render_command_bind_vertex_buffer(app_data->vb, context);
     dm_render_command_bind_index_buffer(app_data->ib, context);
@@ -496,28 +384,43 @@ bool dm_application_render(dm_context* context)
     dm_render_command_draw_instanced_indexed(1,0, _countof(cube_indices),0, 0, context);
 
     // gui rendering
-    dm_render_command_update_vertex_buffer(app_data->gui_data.text_vertices, sizeof(app_data->gui_data.text_vertices), app_data->gui_data.text_vb, context);
-    dm_render_command_update_vertex_buffer(app_data->gui_data.quad_vertices, sizeof(app_data->gui_data.quad_vertices), app_data->gui_data.quad_vb, context);
-
     // quads
     {
-        dm_render_command_bind_vertex_buffer(app_data->gui_data.quad_vb, context);
-        dm_render_command_bind_constant_buffer(app_data->gui_data.cb, 0, context);
+        dm_render_command_update_vertex_buffer(app_data->gui_data.quad_vertices, sizeof(app_data->gui_data.quad_vertices), app_data->gui_data.quad_vb, context);
+
         dm_render_command_bind_raster_pipeline(app_data->gui_data.quad_pipe, context);
+        dm_render_command_bind_constant_buffer(app_data->gui_data.cb, 0, context);
+        dm_render_command_bind_descriptor_group(0, 1, context);
+
+        dm_render_command_bind_vertex_buffer(app_data->gui_data.quad_vb, context);
         dm_render_command_draw_instanced(1,0, app_data->gui_data.quad_count,0, context);
     }
 
-    // text
+    // text 16
+    dm_render_command_bind_raster_pipeline(app_data->gui_data.text_pipe, context);
+    dm_render_command_bind_constant_buffer(app_data->gui_data.cb, 0, context);
+    dm_render_command_bind_descriptor_group(0, 1, context);
+    
     {
-        dm_render_command_bind_vertex_buffer(app_data->gui_data.text_vb, context);
-        dm_render_command_bind_constant_buffer(app_data->gui_data.cb, 0, context);
-        dm_render_command_bind_texture(app_data->gui_data.font.texture_handle, 0, context);
-        dm_render_command_bind_raster_pipeline(app_data->gui_data.text_pipe, context);
-        dm_render_command_draw_instanced(1,0, app_data->gui_data.text_count,0, context);
+        dm_render_command_update_vertex_buffer(app_data->gui_data.font16.vertices, sizeof(app_data->gui_data.font16.vertices), app_data->gui_data.font16.vb, context);
+        dm_render_command_bind_vertex_buffer(app_data->gui_data.font16.vb, context);
+        dm_render_command_bind_texture(app_data->gui_data.font16.font.texture_handle, 0, context);
+        dm_render_command_bind_descriptor_group(1, 1, context);
+        dm_render_command_draw_instanced(1,0, app_data->gui_data.font16.count,0, context);
+    }
+
+    // text 32 
+    {
+        dm_render_command_update_vertex_buffer(app_data->gui_data.font32.vertices, sizeof(app_data->gui_data.font32.vertices), app_data->gui_data.font32.vb, context);
+        dm_render_command_bind_vertex_buffer(app_data->gui_data.font32.vb, context);
+        dm_render_command_bind_texture(app_data->gui_data.font32.font.texture_handle, 0, context);
+        dm_render_command_bind_descriptor_group(1, 1, context);
+        dm_render_command_draw_instanced(1,0, app_data->gui_data.font32.count,0, context);
     }
 
     app_data->gui_data.quad_count = 0;
-    app_data->gui_data.text_count = 0;
+    app_data->gui_data.font16.count = 0;
+    app_data->gui_data.font32.count = 0;
 
     return true;
 }

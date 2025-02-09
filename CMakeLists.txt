@@ -7,7 +7,10 @@ PROJECT(rt_app)
 
 ADD_SUBDIRECTORY(DarkMatter)
 
-SET(SOURCES app.c)
+SET(SOURCES 
+    app.c
+    gui.c
+)
 
 ADD_EXECUTABLE(${PROJECT_NAME} ${SOURCES})
 
