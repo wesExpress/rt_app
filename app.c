@@ -394,7 +394,6 @@ bool dm_application_render(dm_context* context)
 
     dm_render_command_bind_raster_pipeline(app_data->raster_pipe, context);
     dm_render_command_bind_constant_buffer(app_data->cb, 0, context);
-    dm_render_command_bind_descriptor_group(app_data->raster_pipe, 0, context);
 
     dm_render_command_bind_vertex_buffer(app_data->vb, context);
     dm_render_command_bind_index_buffer(app_data->ib, context);
@@ -407,8 +406,6 @@ bool dm_application_render(dm_context* context)
     dm_render_command_bind_raster_pipeline(app_data->gui_pipe, context);
     dm_render_command_bind_constant_buffer(app_data->gui_cb, 0, context);
     dm_render_command_bind_texture(app_data->gui_font.texture_handle, 0, context);
-    dm_render_command_bind_descriptor_group(app_data->gui_pipe, 0, context);
-    dm_render_command_bind_descriptor_group(app_data->gui_pipe, 1, context);
 
     dm_render_command_bind_vertex_buffer(app_data->gui_vb, context);
 
