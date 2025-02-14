@@ -1,8 +1,10 @@
 #include "dm.h"
 #include "data.h"
-#include "gui.h"
+#include "rendering/gui.h"
 
 #include <stdio.h>
+
+#define MAX_INSTANCES 100
 
 typedef struct simple_camera_t
 {
@@ -13,7 +15,7 @@ typedef struct simple_camera_t
 typedef struct application_data_t
 {
     dm_render_handle raster_pipe;
-    dm_render_handle vb, ib, cb;
+    dm_render_handle vb, ib, cb, instb;
 
     void* gui_context;
     uint8_t font16, font32;
@@ -21,9 +23,15 @@ typedef struct application_data_t
     char       fps_text[512];
     char       frame_time_text[512];
 
+    dm_vec3 positions[MAX_INSTANCES];
+    dm_vec3 scales[MAX_INSTANCES];
+    dm_vec3 axes[MAX_INSTANCES];
+    float   angles[MAX_INSTANCES];
+    dm_mat4 models[MAX_INSTANCES];
+
     simple_camera camera;
     dm_mat4       model;
-    dm_mat4       mvp;
+    dm_mat4       vp;
     dm_vec3       axis;
     float         angle;
 
@@ -42,6 +50,37 @@ bool dm_application_init(dm_context* context)
 {
     application_data* app_data = context->app_data;
 
+    for(uint32_t i=0; i<MAX_INSTANCES; i++)
+    {
+        app_data->positions[i][0] = dm_random_float(context) * 10.f - 5.f;
+        app_data->positions[i][1] = dm_random_float(context) * 10.f - 5.f;
+        app_data->positions[i][2] = dm_random_float(context) * 10.f - 5.f;
+
+        app_data->scales[i][0] = dm_random_float(context);
+        app_data->scales[i][1] = dm_random_float(context);
+        app_data->scales[i][2] = dm_random_float(context);
+
+        app_data->axes[i][0] = dm_random_float(context) * 2.f - 1.f;
+        app_data->axes[i][1] = dm_random_float(context) * 2.f - 1.f;
+        app_data->axes[i][2] = dm_random_float(context) * 2.f - 1.f;
+
+        app_data->angles[i] = dm_random_float(context) * 360.f;
+
+        dm_mat4_identity(app_data->models[i]);
+        dm_mat4 rotation;
+        dm_quat orient;
+        dm_quat_from_axis_angle_deg(app_data->axes[i], app_data->angles[i], orient);
+        dm_mat4_rotate_from_quat(orient, rotation);
+
+        dm_mat_translate(app_data->models[i], app_data->positions[i], app_data->models[i]);
+        dm_mat4_mul_mat4(app_data->models[i], rotation, app_data->models[i]);
+
+        dm_mat_scale(app_data->models[i], app_data->scales[i], app_data->models[i]);
+#ifdef DM_DIRECTX12
+        dm_mat4_transpose(app_data->models[i], app_data->models[i]);
+#endif
+    }
+
     // === camera ===
     {
         app_data->camera.pos[2] = 3.f;
@@ -49,9 +88,9 @@ bool dm_application_init(dm_context* context)
         dm_vec3_negate(app_data->camera.pos, app_data->camera.forward);
         
         dm_mat_view(app_data->camera.pos, app_data->camera.forward, app_data->camera.up, app_data->camera.view);
-        dm_mat_perspective(DM_MATH_DEG_TO_RAD * 85.f, (float)context->renderer.width / (float)context->renderer.height, 0.1f, 1000.f, app_data->camera.proj);
+        dm_mat_perspective(DM_MATH_DEG_TO_RAD * 75.f, (float)context->renderer.width / (float)context->renderer.height, 0.1f, 1000.f, app_data->camera.proj);
 
-        dm_mat4_mul_mat4(app_data->camera.view, app_data->camera.proj, app_data->mvp);
+        dm_mat4_mul_mat4(app_data->camera.view, app_data->camera.proj, app_data->vp);
     }
 
     // === vertex buffer ===
@@ -63,6 +102,17 @@ bool dm_application_init(dm_context* context)
         desc.data         = (void*)cube;
 
         if(!dm_renderer_create_vertex_buffer(desc, &app_data->vb, context)) return false;
+    }
+
+    // === instance buffer
+    {
+        dm_vertex_buffer_desc desc = { 0 };
+        desc.size         = sizeof(inst_vertex) * MAX_INSTANCES;
+        desc.element_size = sizeof(float);
+        desc.stride       = sizeof(inst_vertex);
+        desc.data         = app_data->models;
+
+        if(!dm_renderer_create_vertex_buffer(desc, &app_data->instb, context)) return false;
     }
 
     // === index buffer ===
@@ -80,7 +130,7 @@ bool dm_application_init(dm_context* context)
     {
         dm_constant_buffer_desc desc = { 0 };
         desc.size = sizeof(dm_mat4);
-        desc.data = app_data->mvp;
+        desc.data = app_data->vp;
 
         if(!dm_renderer_create_constant_buffer(desc, &app_data->cb, context)) return false;
     }
@@ -105,9 +155,17 @@ bool dm_application_init(dm_context* context)
         input->stride = sizeof(vertex);
         input->offset = offsetof(vertex, color);
 
-        desc.input_assembler.topology = DM_INPUT_TOPOLOGY_TRIANGLE_LIST;
+        input++;
 
-        desc.input_assembler.input_element_count = 2;
+        dm_strcpy(input->name, "MODEL");
+        input->format = DM_INPUT_ELEMENT_FORMAT_MATRIX_4x4;
+        input->class  = DM_INPUT_ELEMENT_CLASS_PER_INSTANCE;
+        input->stride = sizeof(inst_vertex);
+        input->offset = offsetof(inst_vertex, model);
+
+        desc.input_assembler.input_element_count = 3;
+
+        desc.input_assembler.topology = DM_INPUT_TOPOLOGY_TRIANGLE_LIST;
 
         // rasterizer
         desc.rasterizer.cull_mode    = DM_RASTERIZER_CULL_MODE_BACK;
@@ -136,6 +194,9 @@ bool dm_application_init(dm_context* context)
 
         desc.descriptor_group_count = 1;
 
+        // depth stencil
+        desc.depth_stencil.depth = true;
+
         if(!dm_renderer_create_raster_pipeline(desc, &app_data->raster_pipe, context)) return false;
     }
 
@@ -152,7 +213,18 @@ bool dm_application_init(dm_context* context)
 
     // gui
     {
-        if(!gui_init((gui_style){ 0 }, &app_data->gui_context, context)) return false;
+        gui_style style = { 0 };
+        style.text_padding_l = 15.f;
+        style.text_padding_r = 15.f;
+        style.text_padding_b = 15.f;
+        style.text_padding_t = 15.f;
+
+        style.window_border_h = 5.f;
+        style.window_border_w = 5.f;
+
+        style.window_border_color[3] = 1.f;
+
+        if(!gui_init(style, 2, &app_data->gui_context, context)) return false;
 
         if(!gui_load_font("assets/JetBrainsMono-Regular.ttf", 16, &app_data->font16, app_data->gui_context, context)) return false;
         if(!gui_load_font("assets/JetBrainsMono-Regular.ttf", 32, &app_data->font32, app_data->gui_context, context)) return false;
@@ -218,29 +290,43 @@ bool dm_application_update(dm_context* context)
     dm_vec3_add_vec3(app_data->camera.pos, app_data->camera.forward, target);
     dm_mat_view(app_data->camera.pos, target, app_data->camera.up, app_data->camera.view);
 
-    // model matrix
-    app_data->angle += 45.f * context->delta;
-    if(app_data->angle > 360.f) app_data->angle -= 360.f;
-
-    dm_quat orientation;
-    dm_quat_from_axis_angle_deg(app_data->axis, app_data->angle, orientation);
-
-    dm_mat4 rotate;
-    dm_mat4_rotate_from_quat(orientation, rotate);
-
-    dm_mat4 mvp;
-    dm_mat4_mul_mat4(app_data->model, rotate, mvp);
-    dm_mat4_mul_mat4(mvp, app_data->camera.view, mvp);
-    dm_mat4_mul_mat4(mvp, app_data->camera.proj, app_data->mvp);
+    dm_mat4_mul_mat4(app_data->camera.view, app_data->camera.proj, app_data->vp);
 #ifdef DM_DIRECTX12
-    dm_mat4_transpose(app_data->mvp, app_data->mvp);
+    dm_mat4_transpose(app_data->vp, app_data->vp);
 #endif
 
-    // gui
-    gui_draw_quad(100.f,100.f, 500.f,200.f, 0.1f,0.1f,0.7f,1.f, app_data->gui_context);
+    // update models
+    for(uint32_t i=0; i<MAX_INSTANCES; i++)
+    {
+        app_data->angles[i] += 60.f * context->delta;
+        if(app_data->angles[i] >= 360.f) app_data->angles[i] -= 360.f;
 
-    gui_draw_text(110.f,110.f, app_data->fps_text,        1.f,1.f,1.f,1.f, app_data->font16, app_data->gui_context);
-    gui_draw_text(110.f,160.f, app_data->frame_time_text, 1.f,1.f,1.f,1.f, app_data->font32, app_data->gui_context);
+        dm_mat4 rotation;
+        dm_quat orient;
+
+        dm_quat_from_axis_angle_deg(app_data->axes[i], app_data->angles[i], orient);
+        dm_mat4_rotate_from_quat(orient, rotation);
+
+        dm_mat4_identity(app_data->models[i]);
+        dm_mat_scale(app_data->models[i], app_data->scales[i], app_data->models[i]);
+        dm_mat4_mul_mat4(app_data->models[i], rotation, app_data->models[i]);
+        dm_mat_translate(app_data->models[i], app_data->positions[i], app_data->models[i]);
+#ifdef DM_DIRECTX12
+        dm_mat4_transpose(app_data->models[i], app_data->models[i]);
+#endif
+    }
+
+    // gui
+    float quad_color[] = { 0.1f,0.1f,0.7f,1.f };
+    float quad_border_color[] = { 0.f,0.f,0.f,1.f };
+    gui_draw_quad(100.f,100.f, 500.f,200.f, quad_color, app_data->gui_context);
+    gui_draw_quad_border(100.f,500.f, 500.f,200.f, quad_color, quad_border_color, app_data->gui_context);
+
+    float fps_color[] = { 1.f,1.f,1.f,1.f };
+    float frame_timer_color[] = { 1.f,1.f,1.f,1.f };
+
+    gui_draw_text(110.f,110.f, app_data->fps_text,        fps_color, app_data->font16, app_data->gui_context);
+    gui_draw_text(110.f,160.f, app_data->frame_time_text, frame_timer_color, app_data->font32, app_data->gui_context);
 
     return true;
 }
@@ -251,16 +337,18 @@ bool dm_application_render(dm_context* context)
 
     // object rendering
     {
-        dm_render_command_update_constant_buffer(app_data->mvp, sizeof(dm_mat4), app_data->cb, context);
+        dm_render_command_update_constant_buffer(app_data->vp, sizeof(dm_mat4), app_data->cb, context);
+        dm_render_command_update_vertex_buffer(app_data->models, sizeof(app_data->models), app_data->instb, context);
 
         dm_render_command_bind_raster_pipeline(app_data->raster_pipe, context);
         dm_render_command_bind_constant_buffer(app_data->cb, 0, context);
         dm_render_command_bind_descriptor_group(0, 1, context);
 
-        dm_render_command_bind_vertex_buffer(app_data->vb, context);
+        dm_render_command_bind_vertex_buffer(app_data->vb, 0, context);
+        dm_render_command_bind_vertex_buffer(app_data->instb, 1, context);
         dm_render_command_bind_index_buffer(app_data->ib, context);
 
-        dm_render_command_draw_instanced_indexed(1,0, _countof(cube_indices),0, 0, context);
+        dm_render_command_draw_instanced_indexed(MAX_INSTANCES,0, _countof(cube_indices),0, 0, context);
     }
 
     // gui 

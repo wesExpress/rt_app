@@ -9,7 +9,7 @@ ADD_SUBDIRECTORY(DarkMatter)
 
 SET(SOURCES 
     app.c
-    gui.c
+    rendering/gui.c
 )
 
 ADD_EXECUTABLE(${PROJECT_NAME} ${SOURCES})
