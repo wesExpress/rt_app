@@ -368,6 +368,20 @@ void gui_draw_text(float x, float y, const char* input_text, float* color, uint8
     }
 }
 
+void gui_update_buffers(void* gui_ctxt, dm_context* context)
+{
+    gui_context* c = gui_ctxt;
+
+    dm_render_command_update_vertex_buffer(c->quad_vertices, sizeof(c->quad_vertices), c->quad_vb, context);
+
+    for(uint32_t i=0; i<c->font_count; i++)
+    {
+        if(c->text_vertex_count[i]==0) continue;
+
+        dm_render_command_update_vertex_buffer(c->text_vertices[i], sizeof(c->text_vertices[i]), c->font_vb[i], context);
+    }
+}
+
 void gui_render(void* gui_ctxt, dm_context* context)
 {
     gui_context* c = gui_ctxt;
@@ -376,8 +390,6 @@ void gui_render(void* gui_ctxt, dm_context* context)
 
     // quads
     {
-        dm_render_command_update_vertex_buffer(c->quad_vertices, sizeof(c->quad_vertices), c->quad_vb, context);
-
         dm_render_command_bind_raster_pipeline(c->quad_pipe, context);
         dm_render_command_bind_descriptor_group(0, 1, context);
 
@@ -397,7 +409,6 @@ void gui_render(void* gui_ctxt, dm_context* context)
     {
         if(c->text_vertex_count[i]==0) continue;
 
-        dm_render_command_update_vertex_buffer(c->text_vertices[i], sizeof(c->text_vertices[i]), c->font_vb[i], context);
         dm_render_command_bind_vertex_buffer(c->font_vb[i], 0, context);
         dm_render_command_bind_texture(c->fonts[i].texture_handle, 0, context);
         dm_render_command_bind_descriptor_group(1, 1, context);
@@ -406,3 +417,4 @@ void gui_render(void* gui_ctxt, dm_context* context)
         c->text_vertex_count[i] = 0;
     }
 }
+

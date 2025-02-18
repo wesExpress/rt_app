@@ -352,10 +352,14 @@ bool dm_application_render(dm_context* context)
 {
     application_data* app_data = context->app_data;
 
+    dm_render_command_update_vertex_buffer(app_data->instances, sizeof(app_data->instances), app_data->instb, context);
+    gui_update_buffers(app_data->gui_context, context);
+
+    dm_render_command_begin_render_pass(0.2f,0.5f,0.7f,1.f, context);
+
     // object rendering
     {
         dm_render_command_update_constant_buffer(app_data->vp, sizeof(dm_mat4), app_data->cb, context);
-        dm_render_command_update_vertex_buffer(app_data->instances, sizeof(app_data->instances), app_data->instb, context);
 
         dm_render_command_bind_raster_pipeline(app_data->raster_pipe, context);
         dm_render_command_bind_constant_buffer(app_data->cb, 0, context);
@@ -370,6 +374,9 @@ bool dm_application_render(dm_context* context)
 
     // gui 
     gui_render(app_data->gui_context, context);
+
+    // 
+    dm_render_command_end_render_pass(context);
 
     return true;
 }
