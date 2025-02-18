@@ -27,7 +27,8 @@ typedef struct application_data_t
     dm_vec3 scales[MAX_INSTANCES];
     dm_vec3 axes[MAX_INSTANCES];
     float   angles[MAX_INSTANCES];
-    dm_mat4 models[MAX_INSTANCES];
+
+    inst_vertex instances[MAX_INSTANCES];
 
     simple_camera camera;
     dm_mat4       model;
@@ -66,18 +67,18 @@ bool dm_application_init(dm_context* context)
 
         app_data->angles[i] = dm_random_float(context) * 360.f;
 
-        dm_mat4_identity(app_data->models[i]);
+        dm_mat4_identity(app_data->instances[i].obj_model);
         dm_mat4 rotation;
         dm_quat orient;
         dm_quat_from_axis_angle_deg(app_data->axes[i], app_data->angles[i], orient);
         dm_mat4_rotate_from_quat(orient, rotation);
 
-        dm_mat_translate(app_data->models[i], app_data->positions[i], app_data->models[i]);
-        dm_mat4_mul_mat4(app_data->models[i], rotation, app_data->models[i]);
+        dm_mat_translate(app_data->instances[i].obj_model, app_data->positions[i], app_data->instances[i].obj_model);
+        dm_mat4_mul_mat4(app_data->instances[i].obj_model, rotation, app_data->instances[i].obj_model);
 
-        dm_mat_scale(app_data->models[i], app_data->scales[i], app_data->models[i]);
+        dm_mat_scale(app_data->instances[i].obj_model, app_data->scales[i], app_data->instances[i].obj_model);
 #ifdef DM_DIRECTX12
-        dm_mat4_transpose(app_data->models[i], app_data->models[i]);
+        dm_mat4_transpose(app_data->instances[i].obj_model, app_data->instances[i].obj_model);
 #endif
     }
 
@@ -110,7 +111,7 @@ bool dm_application_init(dm_context* context)
         desc.size         = sizeof(inst_vertex) * MAX_INSTANCES;
         desc.element_size = sizeof(float);
         desc.stride       = sizeof(inst_vertex);
-        desc.data         = app_data->models;
+        desc.data         = app_data->instances;
 
         if(!dm_renderer_create_vertex_buffer(desc, &app_data->instb, context)) return false;
     }
@@ -149,6 +150,14 @@ bool dm_application_init(dm_context* context)
 
         input++;
 
+        dm_strcpy(input->name, "NORMAL");
+        input->format = DM_INPUT_ELEMENT_FORMAT_FLOAT_3;
+        input->class  = DM_INPUT_ELEMENT_CLASS_PER_VERTEX;
+        input->stride = sizeof(vertex);
+        input->offset = offsetof(vertex, normal);
+
+        input++;
+
         dm_strcpy(input->name, "COLOR");
         input->format = DM_INPUT_ELEMENT_FORMAT_FLOAT_4;
         input->class  = DM_INPUT_ELEMENT_CLASS_PER_VERTEX;
@@ -157,13 +166,21 @@ bool dm_application_init(dm_context* context)
 
         input++;
 
-        dm_strcpy(input->name, "MODEL");
+        dm_strcpy(input->name, "OBJ_MODEL");
         input->format = DM_INPUT_ELEMENT_FORMAT_MATRIX_4x4;
         input->class  = DM_INPUT_ELEMENT_CLASS_PER_INSTANCE;
         input->stride = sizeof(inst_vertex);
-        input->offset = offsetof(inst_vertex, model);
+        input->offset = offsetof(inst_vertex, obj_model);
 
-        desc.input_assembler.input_element_count = 3;
+        input++;
+
+        dm_strcpy(input->name, "OBJ_NORMAL");
+        input->format = DM_INPUT_ELEMENT_FORMAT_MATRIX_4x4;
+        input->class  = DM_INPUT_ELEMENT_CLASS_PER_INSTANCE;
+        input->stride = sizeof(inst_vertex);
+        input->offset = offsetof(inst_vertex, obj_norm);
+
+        desc.input_assembler.input_element_count = 5;
 
         desc.input_assembler.topology = DM_INPUT_TOPOLOGY_TRIANGLE_LIST;
 
@@ -307,12 +324,12 @@ bool dm_application_update(dm_context* context)
         dm_quat_from_axis_angle_deg(app_data->axes[i], app_data->angles[i], orient);
         dm_mat4_rotate_from_quat(orient, rotation);
 
-        dm_mat4_identity(app_data->models[i]);
-        dm_mat_scale(app_data->models[i], app_data->scales[i], app_data->models[i]);
-        dm_mat4_mul_mat4(app_data->models[i], rotation, app_data->models[i]);
-        dm_mat_translate(app_data->models[i], app_data->positions[i], app_data->models[i]);
+        dm_mat4_identity(app_data->instances[i].obj_model);
+        dm_mat_scale(app_data->instances[i].obj_model, app_data->scales[i], app_data->instances[i].obj_model);
+        dm_mat4_mul_mat4(app_data->instances[i].obj_model, rotation, app_data->instances[i].obj_model);
+        dm_mat_translate(app_data->instances[i].obj_model, app_data->positions[i], app_data->instances[i].obj_model);
 #ifdef DM_DIRECTX12
-        dm_mat4_transpose(app_data->models[i], app_data->models[i]);
+        dm_mat4_transpose(app_data->instances[i].obj_model, app_data->instances[i].obj_model);
 #endif
     }
 
@@ -325,8 +342,8 @@ bool dm_application_update(dm_context* context)
     float fps_color[] = { 1.f,1.f,1.f,1.f };
     float frame_timer_color[] = { 1.f,1.f,1.f,1.f };
 
-    gui_draw_text(110.f,110.f, app_data->fps_text,        fps_color, app_data->font16, app_data->gui_context);
-    gui_draw_text(110.f,160.f, app_data->frame_time_text, frame_timer_color, app_data->font32, app_data->gui_context);
+    //gui_draw_text(110.f,110.f, app_data->fps_text,        fps_color, app_data->font16, app_data->gui_context);
+    //gui_draw_text(110.f,160.f, app_data->frame_time_text, frame_timer_color, app_data->font32, app_data->gui_context);
 
     return true;
 }
@@ -338,7 +355,7 @@ bool dm_application_render(dm_context* context)
     // object rendering
     {
         dm_render_command_update_constant_buffer(app_data->vp, sizeof(dm_mat4), app_data->cb, context);
-        dm_render_command_update_vertex_buffer(app_data->models, sizeof(app_data->models), app_data->instb, context);
+        dm_render_command_update_vertex_buffer(app_data->instances, sizeof(app_data->instances), app_data->instb, context);
 
         dm_render_command_bind_raster_pipeline(app_data->raster_pipe, context);
         dm_render_command_bind_constant_buffer(app_data->cb, 0, context);

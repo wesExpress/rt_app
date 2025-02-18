@@ -106,8 +106,13 @@ bool gui_init(gui_style style, uint8_t font_count, void** gui_ctxt, dm_context* 
         desc.rasterizer.cull_mode    = DM_RASTERIZER_CULL_MODE_BACK;
         desc.rasterizer.polygon_fill = DM_RASTERIZER_POLYGON_FILL_FILL;
         desc.rasterizer.front_face   = DM_RASTERIZER_FRONT_FACE_COUNTER_CLOCKWISE;
+#ifdef DM_DIRECTX12
         dm_strcpy(desc.rasterizer.vertex_shader_desc.path, "assets/quad_vertex.cso");
         dm_strcpy(desc.rasterizer.pixel_shader_desc.path,  "assets/quad_pixel.cso");
+#else
+        dm_strcpy(desc.rasterizer.vertex_shader_desc.path, "assets/quad_vertex.spv");
+        dm_strcpy(desc.rasterizer.pixel_shader_desc.path,  "assets/quad_pixel.spv");
+#endif
 
         desc.viewport.type = DM_VIEWPORT_TYPE_DEFAULT;
         desc.scissor.type  = DM_SCISSOR_TYPE_DEFAULT;
@@ -159,8 +164,13 @@ bool gui_init(gui_style style, uint8_t font_count, void** gui_ctxt, dm_context* 
         desc.rasterizer.cull_mode    = DM_RASTERIZER_CULL_MODE_BACK;
         desc.rasterizer.polygon_fill = DM_RASTERIZER_POLYGON_FILL_FILL;
         desc.rasterizer.front_face   = DM_RASTERIZER_FRONT_FACE_COUNTER_CLOCKWISE;
+#ifdef DM_DIRECTX12
         dm_strcpy(desc.rasterizer.vertex_shader_desc.path, "assets/gui_vertex.cso");
         dm_strcpy(desc.rasterizer.pixel_shader_desc.path,  "assets/gui_pixel.cso");
+#else
+        dm_strcpy(desc.rasterizer.vertex_shader_desc.path, "assets/gui_vertex.spv");
+        dm_strcpy(desc.rasterizer.pixel_shader_desc.path,  "assets/gui_pixel.spv");
+#endif
 
         desc.viewport.type = DM_VIEWPORT_TYPE_DEFAULT;
         desc.scissor.type  = DM_SCISSOR_TYPE_DEFAULT;
@@ -385,6 +395,8 @@ void gui_render(void* gui_ctxt, dm_context* context)
     // fonts
     for(uint8_t i=0; i<c->font_count; i++)
     {
+        if(c->text_vertex_count[i]==0) continue;
+
         dm_render_command_update_vertex_buffer(c->text_vertices[i], sizeof(c->text_vertices[i]), c->font_vb[i], context);
         dm_render_command_bind_vertex_buffer(c->font_vb[i], 0, context);
         dm_render_command_bind_texture(c->fonts[i].texture_handle, 0, context);

@@ -1,7 +1,8 @@
 struct PIXEL_IN 
 {
-    float4 pos   : SV_POSITION;
-    float4 color : COLOR1;
+    float4 pos    : SV_POSITION;
+    float3 normal : NORMAL1;
+    float4 color  : COLOR1;
 };
 
 struct PIXEL_OUT

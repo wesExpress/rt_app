@@ -1,14 +1,17 @@
 struct VERTEX_IN
 {
-    float3 pos   : POSITION;
-    float4 color : COLOR;
-    matrix model : MODEL;
+    float3 pos      : POSITION;
+    float3 normal   : NORMAL;
+    float4 color    : COLOR;
+    matrix model    : OBJ_MODEL;
+    matrix obj_norm : OBJ_NORMAL;
 };
 
 struct VERTEX_OUT
 {
-    float4 pos   : SV_POSITION;
-    float4 color : COLOR1;
+    float4 pos    : SV_POSITION;
+    float3 normal : NORMAL1;
+    float4 color  : COLOR1;
 };
 
 cbuffer ConstantBuffer : register(b0)
