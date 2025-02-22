@@ -334,16 +334,18 @@ bool dm_application_update(dm_context* context)
     }
 
     // gui
-    float quad_color[] = { 0.1f,0.1f,0.7f,1.f };
-    float quad_border_color[] = { 0.f,0.f,0.f,1.f };
+    static float quad_color[] = { 0.1f,0.1f,0.7f,1.f };
+    static float quad_border_color[] = { 0.f,0.f,0.f,1.f };
     gui_draw_quad(100.f,100.f, 500.f,200.f, quad_color, app_data->gui_context);
     gui_draw_quad_border(100.f,500.f, 500.f,200.f, quad_color, quad_border_color, app_data->gui_context);
 
-    float fps_color[] = { 1.f,1.f,1.f,1.f };
-    float frame_timer_color[] = { 1.f,1.f,1.f,1.f };
+    static const float fps_color[] = { 1.f,1.f,1.f,1.f };
+    static const float frame_timer_color[] = { 1.f,1.f,1.f,1.f };
 
-    //gui_draw_text(110.f,110.f, app_data->fps_text,        fps_color, app_data->font16, app_data->gui_context);
-    //gui_draw_text(110.f,160.f, app_data->frame_time_text, frame_timer_color, app_data->font32, app_data->gui_context);
+#ifdef DM_DIRECTX12
+    gui_draw_text(110.f,110.f, app_data->fps_text,        fps_color, app_data->font16, app_data->gui_context);
+    gui_draw_text(110.f,160.f, app_data->frame_time_text, frame_timer_color, app_data->font32, app_data->gui_context);
+#endif
 
     return true;
 }
