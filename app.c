@@ -336,8 +336,10 @@ bool dm_application_update(dm_context* context)
     // gui
     static float quad_color[] = { 0.1f,0.1f,0.7f,1.f };
     static float quad_border_color[] = { 0.f,0.f,0.f,1.f };
+#if 1
     gui_draw_quad(100.f,100.f, 500.f,200.f, quad_color, app_data->gui_context);
     gui_draw_quad_border(100.f,500.f, 500.f,200.f, quad_color, quad_border_color, app_data->gui_context);
+#endif
 
     static const float fps_color[] = { 1.f,1.f,1.f,1.f };
     static const float frame_timer_color[] = { 1.f,1.f,1.f,1.f };
@@ -364,7 +366,7 @@ bool dm_application_render(dm_context* context)
         dm_render_command_update_constant_buffer(app_data->vp, sizeof(dm_mat4), app_data->cb, context);
 
         dm_render_command_bind_raster_pipeline(app_data->raster_pipe, context);
-        dm_render_command_bind_constant_buffer(app_data->cb, 0, context);
+        dm_render_command_bind_constant_buffer(app_data->cb, 0, 0, context);
         dm_render_command_bind_descriptor_group(0, 1, context);
 
         dm_render_command_bind_vertex_buffer(app_data->vb, 0, context);

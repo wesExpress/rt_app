@@ -210,7 +210,7 @@ bool gui_load_font(const char* path, uint8_t font_size, uint8_t* font_index, voi
     return true;
 }
 
-void gui_draw_quad_border(float x, float y, float w, float h, float* color, float* border_color, void* context)
+void gui_draw_quad_border(float x, float y, float w, float h, const float* color, float* border_color, void* context)
 {
     gui_context* c = context;
 
@@ -267,7 +267,7 @@ void gui_draw_quad_border(float x, float y, float w, float h, float* color, floa
     c->quad_vertices[c->quad_vertex_count++] = v2;
 }
 
-void gui_draw_quad(float x, float y, float w, float h, float* color, void* context)
+void gui_draw_quad(float x, float y, float w, float h, const float* color, void* context)
 {
     gui_context* c = context;
 
@@ -299,7 +299,7 @@ void gui_draw_quad(float x, float y, float w, float h, float* color, void* conte
     c->quad_vertices[c->quad_vertex_count++] = v2;
 }
 
-void gui_draw_text(float x, float y, const char* input_text, float* color, uint8_t font_index, void* context)
+void gui_draw_text(float x, float y, const char* input_text, const float* color, uint8_t font_index, void* context)
 {
     gui_context* c = context;
 
@@ -386,11 +386,11 @@ void gui_render(void* gui_ctxt, dm_context* context)
 {
     gui_context* c = gui_ctxt;
 
-    dm_render_command_bind_constant_buffer(c->cb, 0, context);
-
     // quads
+    if(c->quad_vertex_count)
     {
         dm_render_command_bind_raster_pipeline(c->quad_pipe, context);
+        dm_render_command_bind_constant_buffer(c->cb, 0, 0, context);
         dm_render_command_bind_descriptor_group(0, 1, context);
 
         dm_render_command_bind_vertex_buffer(c->quad_vb, 0, context);
@@ -401,7 +401,7 @@ void gui_render(void* gui_ctxt, dm_context* context)
 
     // text rendering
     dm_render_command_bind_raster_pipeline(c->text_pipe, context);
-    dm_render_command_bind_constant_buffer(c->cb, 0, context);
+    dm_render_command_bind_constant_buffer(c->cb, 0,0, context);
     dm_render_command_bind_descriptor_group(0, 1, context);
     
     // fonts
@@ -410,7 +410,7 @@ void gui_render(void* gui_ctxt, dm_context* context)
         if(c->text_vertex_count[i]==0) continue;
 
         dm_render_command_bind_vertex_buffer(c->font_vb[i], 0, context);
-        dm_render_command_bind_texture(c->fonts[i].texture_handle, 0, context);
+        dm_render_command_bind_texture(c->fonts[i].texture_handle, 0, 0, context);
         dm_render_command_bind_descriptor_group(1, 1, context);
         dm_render_command_draw_instanced(1,0, c->text_vertex_count[i],0, context);
 
