@@ -146,7 +146,7 @@ bool gui_init(gui_style style, uint8_t font_count, void** gui_ctxt, dm_context* 
         input->format = DM_INPUT_ELEMENT_FORMAT_FLOAT_2;
         input->class  = DM_INPUT_ELEMENT_CLASS_PER_VERTEX;
         input->stride = sizeof(gui_text_vertex);
-        input->offset = offsetof(gui_text_vertex, pos);
+        input->offset = offsetof(gui_text_vertex, uv);
 
         input++;
 
@@ -391,7 +391,7 @@ void gui_render(void* gui_ctxt, dm_context* context)
     {
         dm_render_command_bind_raster_pipeline(c->quad_pipe, context);
         dm_render_command_bind_constant_buffer(c->cb, 0, 0, context);
-        dm_render_command_bind_descriptor_group(0, 1, context);
+        dm_render_command_bind_descriptor_group(0, 1, 0, context);
 
         dm_render_command_bind_vertex_buffer(c->quad_vb, 0, context);
         dm_render_command_draw_instanced(1,0, c->quad_vertex_count,0, context);
@@ -402,7 +402,7 @@ void gui_render(void* gui_ctxt, dm_context* context)
     // text rendering
     dm_render_command_bind_raster_pipeline(c->text_pipe, context);
     dm_render_command_bind_constant_buffer(c->cb, 0,0, context);
-    dm_render_command_bind_descriptor_group(0, 1, context);
+    dm_render_command_bind_descriptor_group(0, 1, 0, context);
     
     // fonts
     for(uint8_t i=0; i<c->font_count; i++)
@@ -411,7 +411,7 @@ void gui_render(void* gui_ctxt, dm_context* context)
 
         dm_render_command_bind_vertex_buffer(c->font_vb[i], 0, context);
         dm_render_command_bind_texture(c->fonts[i].texture_handle, 0, 0, context);
-        dm_render_command_bind_descriptor_group(1, 1, context);
+        dm_render_command_bind_descriptor_group(1, 1, 1, context);
         dm_render_command_draw_instanced(1,0, c->text_vertex_count[i],0, context);
 
         c->text_vertex_count[i] = 0;
