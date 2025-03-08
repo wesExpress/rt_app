@@ -14,8 +14,9 @@ typedef struct simple_camera_t
 
 typedef struct application_data_t
 {
-    dm_render_handle raster_pipe;
-    dm_render_handle vb, ib, cb, instb;
+    dm_resource_handle raster_pipe;
+    dm_resource_handle vb, ib, cb, instb;
+    dm_resource_handle sb;
 
     void* gui_context;
     uint8_t font16, font32;
@@ -136,6 +137,17 @@ bool dm_application_init(dm_context* context)
         if(!dm_renderer_create_constant_buffer(desc, &app_data->cb, context)) return false;
     }
 
+    // === storage buffer ===
+    {
+        dm_storage_buffer_desc desc = { 0 };
+        desc.size         = sizeof(inst_vertex) * MAX_INSTANCES;
+        desc.element_size = sizeof(float);
+        desc.stride       = sizeof(inst_vertex);
+        desc.data         = app_data->instances;
+
+        if(!dm_renderer_create_storage_buffer(desc, &app_data->sb, context)) return false;
+    }
+
     // === raster pipeline ===
     {
         dm_raster_pipeline_desc desc = { 0 };
@@ -203,11 +215,14 @@ bool dm_application_init(dm_context* context)
         desc.scissor.type  = DM_SCISSOR_TYPE_DEFAULT;
 
         // descriptor groups
-        desc.descriptor_group[0].ranges[0].type       = DM_DESCRIPTOR_RANGE_TYPE_CONSTANT_BUFFER;
-        desc.descriptor_group[0].ranges[0].count      = 1;
-        desc.descriptor_group[0].flags                = DM_DESCRIPTOR_GROUP_FLAG_VERTEX_SHADER;
+        desc.descriptor_group[0].ranges[0].type  = DM_DESCRIPTOR_RANGE_TYPE_CONSTANT_BUFFER;
+        desc.descriptor_group[0].ranges[0].count = 1;
 
-        desc.descriptor_group[0].range_count = 1;
+        desc.descriptor_group[0].ranges[1].type  = DM_DESCRIPTOR_RANGE_TYPE_READ_STORAGE_BUFFER;
+        desc.descriptor_group[0].ranges[1].count = 1;
+
+        desc.descriptor_group[0].flags       = DM_DESCRIPTOR_GROUP_FLAG_VERTEX_SHADER;
+        desc.descriptor_group[0].range_count = 2;
 
         desc.descriptor_group_count = 1;
 
@@ -216,7 +231,6 @@ bool dm_application_init(dm_context* context)
 
         if(!dm_renderer_create_raster_pipeline(desc, &app_data->raster_pipe, context)) return false;
     }
-
 
     // misc
     dm_timer_start(&app_data->frame_timer, context);
@@ -354,24 +368,24 @@ bool dm_application_render(dm_context* context)
     application_data* app_data = context->app_data;
 
     dm_render_command_update_vertex_buffer(app_data->instances, sizeof(app_data->instances), app_data->instb, context);
+    dm_render_command_update_storage_buffer(app_data->instances, sizeof(app_data->instances), app_data->sb, context);
     gui_update_buffers(app_data->gui_context, context);
 
     dm_render_command_begin_render_pass(0.2f,0.5f,0.7f,1.f, context);
 
     // object rendering
-    {
-        dm_render_command_update_constant_buffer(app_data->vp, sizeof(dm_mat4), app_data->cb, context);
+    dm_render_command_update_constant_buffer(app_data->vp, sizeof(dm_mat4), app_data->cb, context);
 
-        dm_render_command_bind_raster_pipeline(app_data->raster_pipe, context);
-        dm_render_command_bind_constant_buffer(app_data->cb, 0, 0, context);
-        dm_render_command_bind_descriptor_group(0, 1, 0, context);
+    dm_render_command_bind_raster_pipeline(app_data->raster_pipe, context);
+    dm_render_command_bind_constant_buffer(app_data->cb, 0, 0, context);
+    dm_render_command_bind_storage_buffer(app_data->sb, 0, 0, context);
+    dm_render_command_bind_descriptor_group(0, 2, 0, context);
 
-        dm_render_command_bind_vertex_buffer(app_data->vb, 0, context);
-        dm_render_command_bind_vertex_buffer(app_data->instb, 1, context);
-        dm_render_command_bind_index_buffer(app_data->ib, context);
+    dm_render_command_bind_vertex_buffer(app_data->vb, 0, context);
+    dm_render_command_bind_vertex_buffer(app_data->instb, 1, context);
+    dm_render_command_bind_index_buffer(app_data->ib, context);
 
-        dm_render_command_draw_instanced_indexed(MAX_INSTANCES,0, _countof(cube_indices),0, 0, context);
-    }
+    dm_render_command_draw_instanced_indexed(MAX_INSTANCES,0, _countof(cube_indices),0, 0, context);
 
     // gui 
     gui_render(app_data->gui_context, context);

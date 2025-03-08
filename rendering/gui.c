@@ -18,11 +18,11 @@ typedef struct gui_text_vertex_t
 
 typedef struct gui_context_t
 {
-    dm_render_handle quad_vb, quad_ib;
+    dm_resource_handle quad_vb, quad_ib;
     gui_quad_vertex  quad_vertices[MAX_GUI_VERTICES];
     uint32_t         quad_vertex_count;
 
-    dm_render_handle font_vb[MAX_FONT_COUNT];
+    dm_resource_handle font_vb[MAX_FONT_COUNT];
     dm_font          fonts[MAX_FONT_COUNT];
     gui_text_vertex  text_vertices[MAX_FONT_COUNT][MAX_GUI_VERTICES];
     uint32_t         text_vertex_count[MAX_FONT_COUNT];
@@ -30,7 +30,7 @@ typedef struct gui_context_t
 
     gui_style style;
 
-    dm_render_handle quad_pipe, text_pipe, cb;
+    dm_resource_handle quad_pipe, text_pipe, cb;
 } gui_context;
 
 bool gui_init(gui_style style, uint8_t font_count, void** gui_ctxt, dm_context* context)
