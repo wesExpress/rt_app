@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 #define MAX_INSTANCES 100
+#define COMPUTE_BUFFER_COUNT 1024 * 100 
 
 typedef struct simple_camera_t
 {
@@ -17,6 +18,12 @@ typedef struct application_data_t
     dm_resource_handle raster_pipe;
     dm_resource_handle vb, ib, cb, instb;
     dm_resource_handle sb;
+
+    dm_resource_handle compute_sb, compute_sb2;
+    dm_resource_handle compute_pipe;
+
+    int read_buffer[COMPUTE_BUFFER_COUNT];
+    int write_buffer[COMPUTE_BUFFER_COUNT];
 
     void* gui_context;
     uint8_t font16, font32;
@@ -232,6 +239,40 @@ bool dm_application_init(dm_context* context)
         if(!dm_renderer_create_raster_pipeline(desc, &app_data->raster_pipe, context)) return false;
     }
 
+    // compute pipeline
+    {
+        dm_storage_buffer_desc b_desc = { 0 };
+        b_desc.write        = false;
+        b_desc.size         = COMPUTE_BUFFER_COUNT * sizeof(int);
+        b_desc.element_size = sizeof(int);
+        b_desc.stride       = sizeof(int);
+        b_desc.data         = app_data->read_buffer;
+
+        if(!dm_renderer_create_storage_buffer(b_desc, &app_data->compute_sb, context)) return false;
+
+        b_desc.write = true;
+        b_desc.data  = app_data->write_buffer;
+        if(!dm_renderer_create_storage_buffer(b_desc, &app_data->compute_sb2, context)) return false;
+
+        dm_compute_pipeline_desc desc = { 0 };
+#ifdef DM_DIRECTX12
+        dm_strcpy(desc.shader.path, "assets/compute_shader.cso");
+#elif defined(DM_VULKAN)
+#endif
+
+        desc.descriptor_group[0].ranges[0].type  = DM_DESCRIPTOR_RANGE_TYPE_READ_STORAGE_BUFFER;
+        desc.descriptor_group[0].ranges[0].count = 1;
+
+        desc.descriptor_group[0].ranges[1].type  = DM_DESCRIPTOR_RANGE_TYPE_WRITE_STORAGE_BUFFER;
+        desc.descriptor_group[0].ranges[1].count = 1;
+
+        desc.descriptor_group[0].range_count = 2;
+
+        desc.descriptor_group_count = 1;
+
+        if(!dm_compute_create_compute_pipeline(desc, &app_data->compute_pipe, context)) return false;
+    }
+
     // misc
     dm_timer_start(&app_data->frame_timer, context);
     dm_timer_start(&app_data->fps_timer, context);
@@ -367,6 +408,16 @@ bool dm_application_render(dm_context* context)
 {
     application_data* app_data = context->app_data;
 
+    // compute first
+    dm_compute_command_begin_recording(context);
+        dm_compute_command_bind_compute_pipeline(app_data->compute_pipe, context);
+        dm_compute_command_bind_storage_buffer(app_data->compute_sb, 0,0, context);
+        dm_compute_command_bind_storage_buffer(app_data->compute_sb2, 0,0, context);
+        dm_compute_command_bind_descriptor_group(0,2,0, context);
+        dm_compute_command_dispatch(1024,1,1, context);
+    dm_compute_command_end_recording(context);
+
+    // render after
     dm_render_command_update_vertex_buffer(app_data->instances, sizeof(app_data->instances), app_data->instb, context);
     dm_render_command_update_storage_buffer(app_data->instances, sizeof(app_data->instances), app_data->sb, context);
     gui_update_buffers(app_data->gui_context, context);
