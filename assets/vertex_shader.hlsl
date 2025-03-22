@@ -3,8 +3,6 @@ struct VERTEX_IN
     float3 pos      : POSITION;
     float3 normal   : NORMAL;
     float4 color    : COLOR;
-    matrix model    : OBJ_MODEL;
-    matrix obj_norm : OBJ_NORMAL;
 };
 
 struct VERTEX_OUT

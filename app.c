@@ -5,7 +5,7 @@
 #include <stdio.h>
 
 #define MAX_INSTANCES 100
-#define COMPUTE_BUFFER_COUNT 1024 * 100 
+#define COMPUTE_BUFFER_COUNT 1024
 
 typedef struct simple_camera_t
 {
@@ -185,6 +185,7 @@ bool dm_application_init(dm_context* context)
 
         input++;
 
+#if 0
         dm_strcpy(input->name, "OBJ_MODEL");
         input->format = DM_INPUT_ELEMENT_FORMAT_MATRIX_4x4;
         input->class  = DM_INPUT_ELEMENT_CLASS_PER_INSTANCE;
@@ -198,8 +199,8 @@ bool dm_application_init(dm_context* context)
         input->class  = DM_INPUT_ELEMENT_CLASS_PER_INSTANCE;
         input->stride = sizeof(inst_vertex);
         input->offset = offsetof(inst_vertex, obj_norm);
-
-        desc.input_assembler.input_element_count = 5;
+#endif
+        desc.input_assembler.input_element_count = 3;
 
         desc.input_assembler.topology = DM_INPUT_TOPOLOGY_TRIANGLE_LIST;
 
@@ -258,6 +259,7 @@ bool dm_application_init(dm_context* context)
 #ifdef DM_DIRECTX12
         dm_strcpy(desc.shader.path, "assets/compute_shader.cso");
 #elif defined(DM_VULKAN)
+        dm_strcpy(desc.shader.path, "assets/compute_shader.spv");
 #endif
 
         desc.descriptor_group[0].ranges[0].type  = DM_DESCRIPTOR_RANGE_TYPE_READ_STORAGE_BUFFER;
@@ -409,13 +411,11 @@ bool dm_application_render(dm_context* context)
     application_data* app_data = context->app_data;
 
     // compute first
-    dm_compute_command_begin_recording(context);
-        dm_compute_command_bind_compute_pipeline(app_data->compute_pipe, context);
-        dm_compute_command_bind_storage_buffer(app_data->compute_sb, 0,0, context);
-        dm_compute_command_bind_storage_buffer(app_data->compute_sb2, 0,0, context);
-        dm_compute_command_bind_descriptor_group(0,2,0, context);
-        dm_compute_command_dispatch(1024,1,1, context);
-    dm_compute_command_end_recording(context);
+    dm_compute_command_bind_compute_pipeline(app_data->compute_pipe, context);
+    dm_compute_command_bind_storage_buffer(app_data->compute_sb,  0,0, context);
+    dm_compute_command_bind_storage_buffer(app_data->compute_sb2, 1,0, context);
+    dm_compute_command_bind_descriptor_group(0,2,0, context);
+    dm_compute_command_dispatch(1024,1,1, context);
 
     // render after
     dm_render_command_update_vertex_buffer(app_data->instances, sizeof(app_data->instances), app_data->instb, context);
@@ -428,12 +428,12 @@ bool dm_application_render(dm_context* context)
     dm_render_command_update_constant_buffer(app_data->vp, sizeof(dm_mat4), app_data->cb, context);
 
     dm_render_command_bind_raster_pipeline(app_data->raster_pipe, context);
-    dm_render_command_bind_constant_buffer(app_data->cb, 0, 0, context);
-    dm_render_command_bind_storage_buffer(app_data->sb, 0, 0, context);
-    dm_render_command_bind_descriptor_group(0, 2, 0, context);
+    dm_render_command_bind_constant_buffer(app_data->cb, 0,0, context);
+    dm_render_command_bind_storage_buffer(app_data->sb,  1,0, context);
+    dm_render_command_bind_descriptor_group(0,2,0, context);
 
     dm_render_command_bind_vertex_buffer(app_data->vb, 0, context);
-    dm_render_command_bind_vertex_buffer(app_data->instb, 1, context);
+    //dm_render_command_bind_vertex_buffer(app_data->instb, 1, context);
     dm_render_command_bind_index_buffer(app_data->ib, context);
 
     dm_render_command_draw_instanced_indexed(MAX_INSTANCES,0, _countof(cube_indices),0, 0, context);
