@@ -4,8 +4,10 @@
 
 #include <stdio.h>
 
-#define MAX_INSTANCES 100
+#define MAX_INSTANCES 10000
 #define COMPUTE_BUFFER_COUNT 1024
+#define INDEX_TYPE DM_INDEX_BUFFER_INDEX_TYPE_UINT32
+#define CUBE_BLAS 0
 
 typedef struct simple_camera_t
 {
@@ -22,8 +24,14 @@ typedef struct application_data_t
     dm_resource_handle compute_sb, compute_sb2;
     dm_resource_handle compute_pipe;
 
+    dm_resource_handle rt_pipe, acceleration_structure;
+    uint8_t            instance_blas[MAX_INSTANCES];
+    size_t             blas_addresses[DM_TLAS_MAX_BLAS];
+
     int read_buffer[COMPUTE_BUFFER_COUNT];
     int write_buffer[COMPUTE_BUFFER_COUNT];
+
+    dm_raytracing_instance raytracing_instances[MAX_INSTANCES];
 
     void* gui_context;
     uint8_t font16, font32;
@@ -88,6 +96,11 @@ bool dm_application_init(dm_context* context)
 #ifdef DM_DIRECTX12
         dm_mat4_transpose(app_data->instances[i].obj_model, app_data->instances[i].obj_model);
 #endif
+
+        // raytracing instances
+        dm_memcpy(app_data->raytracing_instances[i].transform, app_data->instances[i].obj_model, sizeof(float) * 3 * 4);
+        app_data->raytracing_instances[i].blas_address = 0;
+        app_data->raytracing_instances[i].id = i;
     }
 
     // === camera ===
@@ -130,7 +143,7 @@ bool dm_application_init(dm_context* context)
         desc.size         = sizeof(cube_indices);
         desc.element_size = sizeof(uint32_t);
         desc.data         = (void*)cube_indices;
-        desc.index_type   = DM_INDEX_BUFFER_INDEX_TYPE_UINT32;
+        desc.index_type   = INDEX_TYPE;
 
         if(!dm_renderer_create_index_buffer(desc, &app_data->ib, context)) return false;
     }
@@ -222,7 +235,8 @@ bool dm_application_init(dm_context* context)
         desc.viewport.type = DM_VIEWPORT_TYPE_DEFAULT;
         desc.scissor.type  = DM_SCISSOR_TYPE_DEFAULT;
 
-        // descriptor groups
+        // descriptors 
+#if 0
         desc.descriptor_group[0].ranges[0].type  = DM_DESCRIPTOR_RANGE_TYPE_CONSTANT_BUFFER;
         desc.descriptor_group[0].ranges[0].count = 1;
 
@@ -233,11 +247,53 @@ bool dm_application_init(dm_context* context)
         desc.descriptor_group[0].range_count = 2;
 
         desc.descriptor_group_count = 1;
+#endif
+
+        desc.descriptor_group[0].descriptors[0] = DM_DESCRIPTOR_TYPE_CONSTANT_BUFFER;
+        desc.descriptor_group[0].descriptors[1] = DM_DESCRIPTOR_TYPE_READ_STORAGE_BUFFER;
+        desc.descriptor_group[0].count          = 2;
 
         // depth stencil
         desc.depth_stencil.depth = true;
 
         if(!dm_renderer_create_raster_pipeline(desc, &app_data->raster_pipe, context)) return false;
+    }
+
+    // === raytracing ===
+    {
+        dm_acceleration_structure_desc desc = { 0 };
+        desc.tlas.blas[0].flags         = DM_BLAS_GEOMETRY_FLAG_OPAQUE;
+        desc.tlas.blas[0].geometry_type = DM_BLAS_GEOMETRY_TYPE_TRIANGLES;
+        desc.tlas.blas[0].vertex_type   = DM_BLAS_VERTEX_TYPE_FLOAT_3;
+        desc.tlas.blas[0].vertex_count  = sizeof(cube) / sizeof(vertex); 
+        desc.tlas.blas[0].vertex_buffer = app_data->vb;
+        desc.tlas.blas[0].vertex_stride = sizeof(vertex);
+        desc.tlas.blas[0].index_type    = INDEX_TYPE;
+        desc.tlas.blas[0].index_count   = _countof(cube_indices);
+        desc.tlas.blas[0].index_buffer  = app_data->ib;
+
+        desc.tlas.blas_count     = 1;
+        desc.tlas.instance_count = MAX_INSTANCES;
+        desc.tlas.instances = app_data->raytracing_instances;
+        
+        if(!dm_renderer_create_acceleration_structure(desc, &app_data->acceleration_structure, context)) return false;
+
+        dm_raytracing_pipeline_desc rt_pipe_desc = { 0 };
+
+        rt_pipe_desc.hit_group_count = 1;
+        rt_pipe_desc.hit_groups[0].type = DM_RT_PIPE_HIT_GROUP_TYPE_TRIANGLES;
+        dm_strcpy(rt_pipe_desc.hit_groups[0].name, "hit_group");
+        dm_strcpy(rt_pipe_desc.hit_groups[0].shaders[DM_RT_PIPE_HIT_GROUP_STAGE_CLOSEST], "closest_hit");
+        dm_strcpy(rt_pipe_desc.hit_groups[0].path, "assets/rt_shader.cso");
+        rt_pipe_desc.hit_groups[0].flags |= DM_RT_PIPE_HIT_GROUP_FLAG_CLOSEST;
+
+        rt_pipe_desc.descriptor_group[0].descriptors[0] = DM_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE;
+        rt_pipe_desc.descriptor_group[0].descriptors[1] = DM_DESCRIPTOR_TYPE_WRITE_TEXTURE;
+        rt_pipe_desc.descriptor_group[0].descriptors[2] = DM_DESCRIPTOR_TYPE_CONSTANT_BUFFER;
+        rt_pipe_desc.descriptor_group[0].count    = 3;
+        rt_pipe_desc.descriptor_group_count = 1;
+
+        //if(!dm_renderer_create_raytracing_pipeline(rt_pipe_desc, &app_data->rt_pipe, context)) return false;
     }
 
     // compute pipeline
@@ -262,14 +318,9 @@ bool dm_application_init(dm_context* context)
         dm_strcpy(desc.shader.path, "assets/compute_shader.spv");
 #endif
 
-        desc.descriptor_group[0].ranges[0].type  = DM_DESCRIPTOR_RANGE_TYPE_READ_STORAGE_BUFFER;
-        desc.descriptor_group[0].ranges[0].count = 1;
-
-        desc.descriptor_group[0].ranges[1].type  = DM_DESCRIPTOR_RANGE_TYPE_WRITE_STORAGE_BUFFER;
-        desc.descriptor_group[0].ranges[1].count = 1;
-
-        desc.descriptor_group[0].range_count = 2;
-
+        desc.descriptor_group[0].descriptors[0] = DM_DESCRIPTOR_TYPE_READ_STORAGE_BUFFER;
+        desc.descriptor_group[0].descriptors[1] = DM_DESCRIPTOR_TYPE_WRITE_STORAGE_BUFFER;
+        desc.descriptor_group[0].count          = 2;
         desc.descriptor_group_count = 1;
 
         if(!dm_compute_create_compute_pipeline(desc, &app_data->compute_pipe, context)) return false;
@@ -369,6 +420,9 @@ bool dm_application_update(dm_context* context)
     dm_mat4_transpose(app_data->vp, app_data->vp);
 #endif
 
+    // get blas gpu address
+    if(!dm_renderer_get_blas_gpu_address(app_data->acceleration_structure, CUBE_BLAS, &app_data->blas_addresses[CUBE_BLAS], context)) return false;
+
     // update models
     for(uint32_t i=0; i<MAX_INSTANCES; i++)
     {
@@ -388,6 +442,10 @@ bool dm_application_update(dm_context* context)
 #ifdef DM_DIRECTX12
         dm_mat4_transpose(app_data->instances[i].obj_model, app_data->instances[i].obj_model);
 #endif
+
+        // raytracing instances
+        dm_memcpy(app_data->raytracing_instances[i].transform, app_data->instances[i].obj_model, sizeof(float) * 3 * 4);
+        app_data->raytracing_instances[i].blas_address = app_data->blas_addresses[CUBE_BLAS];
     }
 
     // gui
@@ -400,8 +458,12 @@ bool dm_application_update(dm_context* context)
     static const float fps_color[] = { 1.f,1.f,1.f,1.f };
     static const float frame_timer_color[] = { 1.f,1.f,1.f,1.f };
 
+    char t[512];
+    sprintf(t, "Instance count: %u", MAX_INSTANCES);
+
     gui_draw_text(110.f,110.f, app_data->fps_text,        fps_color, app_data->font16, app_data->gui_context);
     gui_draw_text(110.f,160.f, app_data->frame_time_text, frame_timer_color, app_data->font32, app_data->gui_context);
+    gui_draw_text(110.f,210.f, t, fps_color, app_data->font16, app_data->gui_context); 
 
     return true;
 }
@@ -420,6 +482,7 @@ bool dm_application_render(dm_context* context)
     // render after
     dm_render_command_update_vertex_buffer(app_data->instances, sizeof(app_data->instances), app_data->instb, context);
     dm_render_command_update_storage_buffer(app_data->instances, sizeof(app_data->instances), app_data->sb, context);
+    dm_render_command_update_acceleration_structure(app_data->raytracing_instances, sizeof(app_data->raytracing_instances), MAX_INSTANCES, app_data->acceleration_structure, context);
     gui_update_buffers(app_data->gui_context, context);
 
     dm_render_command_begin_render_pass(0.2f,0.5f,0.7f,1.f, context);

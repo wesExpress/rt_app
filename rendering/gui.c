@@ -118,6 +118,7 @@ bool gui_init(gui_style style, uint8_t font_count, void** gui_ctxt, dm_context* 
         desc.scissor.type  = DM_SCISSOR_TYPE_DEFAULT;
 
         // descriptors
+#if 0
         desc.descriptor_group[0].ranges[0].type       = DM_DESCRIPTOR_RANGE_TYPE_CONSTANT_BUFFER;
         desc.descriptor_group[0].ranges[0].count      = 1;
         desc.descriptor_group[0].flags                = DM_DESCRIPTOR_GROUP_FLAG_VERTEX_SHADER;
@@ -125,6 +126,10 @@ bool gui_init(gui_style style, uint8_t font_count, void** gui_ctxt, dm_context* 
         desc.descriptor_group[0].range_count = 1;
 
         desc.descriptor_group_count = 1;
+#endif
+    
+        desc.descriptor_group[0].descriptors[0] = DM_DESCRIPTOR_TYPE_CONSTANT_BUFFER;
+        desc.descriptor_group[0].count          = 1;
 
         if(!dm_renderer_create_raster_pipeline(desc, &c->quad_pipe, context)) return false;
     }
@@ -176,6 +181,7 @@ bool gui_init(gui_style style, uint8_t font_count, void** gui_ctxt, dm_context* 
         desc.scissor.type  = DM_SCISSOR_TYPE_DEFAULT;
 
         // descriptors
+#if 0
         desc.descriptor_group[0].ranges[0].type       = DM_DESCRIPTOR_RANGE_TYPE_CONSTANT_BUFFER;
         desc.descriptor_group[0].ranges[0].count      = 1;
         desc.descriptor_group[0].flags                = DM_DESCRIPTOR_GROUP_FLAG_VERTEX_SHADER;
@@ -189,6 +195,11 @@ bool gui_init(gui_style style, uint8_t font_count, void** gui_ctxt, dm_context* 
         desc.descriptor_group[1].range_count = 1;
 
         desc.descriptor_group_count = 2;
+#endif
+    
+        desc.descriptor_group[0].descriptors[0] = DM_DESCRIPTOR_TYPE_CONSTANT_BUFFER;
+        desc.descriptor_group[0].descriptors[1] = DM_DESCRIPTOR_TYPE_TEXTURE;
+        desc.descriptor_group[0].count          = 2;
 
         // depth stencil
         desc.depth_stencil.depth = false;
