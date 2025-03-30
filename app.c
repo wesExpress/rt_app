@@ -236,22 +236,12 @@ bool dm_application_init(dm_context* context)
         desc.scissor.type  = DM_SCISSOR_TYPE_DEFAULT;
 
         // descriptors 
-#if 0
-        desc.descriptor_group[0].ranges[0].type  = DM_DESCRIPTOR_RANGE_TYPE_CONSTANT_BUFFER;
-        desc.descriptor_group[0].ranges[0].count = 1;
-
-        desc.descriptor_group[0].ranges[1].type  = DM_DESCRIPTOR_RANGE_TYPE_READ_STORAGE_BUFFER;
-        desc.descriptor_group[0].ranges[1].count = 1;
-
-        desc.descriptor_group[0].flags       = DM_DESCRIPTOR_GROUP_FLAG_VERTEX_SHADER;
-        desc.descriptor_group[0].range_count = 2;
+        desc.descriptor_groups[0].descriptors[0]  = DM_DESCRIPTOR_TYPE_CONSTANT_BUFFER;
+        desc.descriptor_groups[0].descriptors[1]  = DM_DESCRIPTOR_TYPE_READ_STORAGE_BUFFER;
+        desc.descriptor_groups[0].count           = 2;
+        desc.descriptor_groups[0].flags          |= DM_DESCRIPTOR_GROUP_FLAG_VERTEX_SHADER;
 
         desc.descriptor_group_count = 1;
-#endif
-
-        desc.descriptor_group[0].descriptors[0] = DM_DESCRIPTOR_TYPE_CONSTANT_BUFFER;
-        desc.descriptor_group[0].descriptors[1] = DM_DESCRIPTOR_TYPE_READ_STORAGE_BUFFER;
-        desc.descriptor_group[0].count          = 2;
 
         // depth stencil
         desc.depth_stencil.depth = true;
@@ -287,10 +277,10 @@ bool dm_application_init(dm_context* context)
         dm_strcpy(rt_pipe_desc.hit_groups[0].path, "assets/rt_shader.cso");
         rt_pipe_desc.hit_groups[0].flags |= DM_RT_PIPE_HIT_GROUP_FLAG_CLOSEST;
 
-        rt_pipe_desc.descriptor_group[0].descriptors[0] = DM_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE;
-        rt_pipe_desc.descriptor_group[0].descriptors[1] = DM_DESCRIPTOR_TYPE_WRITE_TEXTURE;
-        rt_pipe_desc.descriptor_group[0].descriptors[2] = DM_DESCRIPTOR_TYPE_CONSTANT_BUFFER;
-        rt_pipe_desc.descriptor_group[0].count    = 3;
+        rt_pipe_desc.descriptor_groups[0].descriptors[0] = DM_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE;
+        rt_pipe_desc.descriptor_groups[0].descriptors[1] = DM_DESCRIPTOR_TYPE_WRITE_TEXTURE;
+        rt_pipe_desc.descriptor_groups[0].descriptors[2] = DM_DESCRIPTOR_TYPE_CONSTANT_BUFFER;
+        rt_pipe_desc.descriptor_groups[0].count    = 3;
         rt_pipe_desc.descriptor_group_count = 1;
 
         //if(!dm_renderer_create_raytracing_pipeline(rt_pipe_desc, &app_data->rt_pipe, context)) return false;
@@ -318,9 +308,10 @@ bool dm_application_init(dm_context* context)
         dm_strcpy(desc.shader.path, "assets/compute_shader.spv");
 #endif
 
-        desc.descriptor_group[0].descriptors[0] = DM_DESCRIPTOR_TYPE_READ_STORAGE_BUFFER;
-        desc.descriptor_group[0].descriptors[1] = DM_DESCRIPTOR_TYPE_WRITE_STORAGE_BUFFER;
-        desc.descriptor_group[0].count          = 2;
+        desc.descriptor_groups[0].descriptors[0]  = DM_DESCRIPTOR_TYPE_READ_STORAGE_BUFFER;
+        desc.descriptor_groups[0].descriptors[1]  = DM_DESCRIPTOR_TYPE_WRITE_STORAGE_BUFFER;
+        desc.descriptor_groups[0].count           = 2;
+        desc.descriptor_groups[0].flags          |= DM_DESCRIPTOR_GROUP_FLAG_COMPUTE_SHADER;
         desc.descriptor_group_count = 1;
 
         if(!dm_compute_create_compute_pipeline(desc, &app_data->compute_pipe, context)) return false;
@@ -349,7 +340,11 @@ bool dm_application_init(dm_context* context)
 
         style.window_border_color[3] = 1.f;
 
-        if(!gui_init(style, 2, &app_data->gui_context, context)) return false;
+        if(!gui_init(style, 2, &app_data->gui_context, context)) 
+        {
+            DM_LOG_ERROR("Could not initialize gui rendering");
+            return false;
+        }
 
         if(!gui_load_font("assets/JetBrainsMono-Regular.ttf", 16, &app_data->font16, app_data->gui_context, context)) return false;
         if(!gui_load_font("assets/JetBrainsMono-Regular.ttf", 32, &app_data->font32, app_data->gui_context, context)) return false;
