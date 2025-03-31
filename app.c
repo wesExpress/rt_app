@@ -4,10 +4,10 @@
 
 #include <stdio.h>
 
-#define MAX_INSTANCES 10000
-#define COMPUTE_BUFFER_COUNT 1024
+#define MAX_INSTANCES 100000
 #define INDEX_TYPE DM_INDEX_BUFFER_INDEX_TYPE_UINT32
 #define CUBE_BLAS 0
+#define WORLD_SCALE 100.f
 
 typedef struct simple_camera_t
 {
@@ -15,21 +15,30 @@ typedef struct simple_camera_t
     dm_mat4 view, proj;
 } simple_camera;
 
+typedef struct transform_t
+{
+    dm_vec4 position;
+    dm_vec4 scale;
+    dm_quat orientation;
+} transform;
+
+typedef struct instance_t 
+{
+    dm_mat4 model;
+    dm_mat4 normal;
+} instance;
+
 typedef struct application_data_t
 {
     dm_resource_handle raster_pipe;
-    dm_resource_handle vb, ib, cb, instb;
-    dm_resource_handle sb;
+    dm_resource_handle vb, ib, cb;
 
-    dm_resource_handle compute_sb, compute_sb2;
+    dm_resource_handle transform_sb, model_sb;
     dm_resource_handle compute_pipe;
 
     dm_resource_handle rt_pipe, acceleration_structure;
     uint8_t            instance_blas[MAX_INSTANCES];
     size_t             blas_addresses[DM_TLAS_MAX_BLAS];
-
-    int read_buffer[COMPUTE_BUFFER_COUNT];
-    int write_buffer[COMPUTE_BUFFER_COUNT];
 
     dm_raytracing_instance raytracing_instances[MAX_INSTANCES];
 
@@ -39,12 +48,14 @@ typedef struct application_data_t
     char       fps_text[512];
     char       frame_time_text[512];
 
+    transform transforms[MAX_INSTANCES];
+
     dm_vec3 positions[MAX_INSTANCES];
     dm_vec3 scales[MAX_INSTANCES];
     dm_vec3 axes[MAX_INSTANCES];
     float   angles[MAX_INSTANCES];
 
-    inst_vertex instances[MAX_INSTANCES];
+    instance instances[MAX_INSTANCES];
 
     simple_camera camera;
     dm_mat4       model;
@@ -63,42 +74,55 @@ void dm_application_setup(dm_context_init_packet* init_packet)
     init_packet->app_data_size = sizeof(application_data);
 }
 
+#ifndef DM_DEBUG
+DM_INLINE
+#endif
+transform init_transform(float world_scale, dm_context* context)
+{
+    transform t;
+
+    t.position[0] = dm_random_float(context) * world_scale - world_scale * 0.5f;
+    t.position[1] = dm_random_float(context) * world_scale - world_scale * 0.5f;
+    t.position[2] = dm_random_float(context) * world_scale - world_scale * 0.5f;
+
+    t.scale[0] = dm_random_float(context);
+    t.scale[1] = dm_random_float(context);
+    t.scale[2] = dm_random_float(context);
+
+    t.orientation[0] = dm_random_float(context);
+    t.orientation[1] = dm_random_float(context);
+    t.orientation[2] = dm_random_float(context);
+    t.orientation[3] = 1.f;
+
+    return t;
+}
+
 bool dm_application_init(dm_context* context)
 {
     application_data* app_data = context->app_data;
 
+    // initialize instances
     for(uint32_t i=0; i<MAX_INSTANCES; i++)
     {
-        app_data->positions[i][0] = dm_random_float(context) * 10.f - 5.f;
-        app_data->positions[i][1] = dm_random_float(context) * 10.f - 5.f;
-        app_data->positions[i][2] = dm_random_float(context) * 10.f - 5.f;
+        app_data->transforms[i] = init_transform(WORLD_SCALE, context);
 
-        app_data->scales[i][0] = dm_random_float(context);
-        app_data->scales[i][1] = dm_random_float(context);
-        app_data->scales[i][2] = dm_random_float(context);
-
-        app_data->axes[i][0] = dm_random_float(context) * 2.f - 1.f;
-        app_data->axes[i][1] = dm_random_float(context) * 2.f - 1.f;
-        app_data->axes[i][2] = dm_random_float(context) * 2.f - 1.f;
-
-        app_data->angles[i] = dm_random_float(context) * 360.f;
-
-        dm_mat4_identity(app_data->instances[i].obj_model);
+#if 0
+        dm_mat4_identity(app_data->instances[i].model);
         dm_mat4 rotation;
         dm_quat orient;
         dm_quat_from_axis_angle_deg(app_data->axes[i], app_data->angles[i], orient);
         dm_mat4_rotate_from_quat(orient, rotation);
 
-        dm_mat_translate(app_data->instances[i].obj_model, app_data->positions[i], app_data->instances[i].obj_model);
-        dm_mat4_mul_mat4(app_data->instances[i].obj_model, rotation, app_data->instances[i].obj_model);
+        dm_mat_translate(app_data->instances[i].model, app_data->positions[i], app_data->instances[i].model);
+        dm_mat4_mul_mat4(app_data->instances[i].model, rotation, app_data->instances[i].model);
 
-        dm_mat_scale(app_data->instances[i].obj_model, app_data->scales[i], app_data->instances[i].obj_model);
+        dm_mat_scale(app_data->instances[i].model, app_data->scales[i], app_data->instances[i].model);
 #ifdef DM_DIRECTX12
-        dm_mat4_transpose(app_data->instances[i].obj_model, app_data->instances[i].obj_model);
+        dm_mat4_transpose(app_data->instances[i].model, app_data->instances[i].model);
 #endif
-
+#endif
         // raytracing instances
-        dm_memcpy(app_data->raytracing_instances[i].transform, app_data->instances[i].obj_model, sizeof(float) * 3 * 4);
+        //dm_memcpy(app_data->raytracing_instances[i].transform, app_data->instances[i].obj_model, sizeof(float) * 3 * 4);
         app_data->raytracing_instances[i].blas_address = 0;
         app_data->raytracing_instances[i].id = i;
     }
@@ -126,17 +150,6 @@ bool dm_application_init(dm_context* context)
         if(!dm_renderer_create_vertex_buffer(desc, &app_data->vb, context)) return false;
     }
 
-    // === instance buffer
-    {
-        dm_vertex_buffer_desc desc = { 0 };
-        desc.size         = sizeof(inst_vertex) * MAX_INSTANCES;
-        desc.element_size = sizeof(float);
-        desc.stride       = sizeof(inst_vertex);
-        desc.data         = app_data->instances;
-
-        if(!dm_renderer_create_vertex_buffer(desc, &app_data->instb, context)) return false;
-    }
-
     // === index buffer ===
     {
         dm_index_buffer_desc desc = { 0 };
@@ -155,17 +168,6 @@ bool dm_application_init(dm_context* context)
         desc.data = app_data->vp;
 
         if(!dm_renderer_create_constant_buffer(desc, &app_data->cb, context)) return false;
-    }
-
-    // === storage buffer ===
-    {
-        dm_storage_buffer_desc desc = { 0 };
-        desc.size         = sizeof(inst_vertex) * MAX_INSTANCES;
-        desc.element_size = sizeof(float);
-        desc.stride       = sizeof(inst_vertex);
-        desc.data         = app_data->instances;
-
-        if(!dm_renderer_create_storage_buffer(desc, &app_data->sb, context)) return false;
     }
 
     // === raster pipeline ===
@@ -198,21 +200,6 @@ bool dm_application_init(dm_context* context)
 
         input++;
 
-#if 0
-        dm_strcpy(input->name, "OBJ_MODEL");
-        input->format = DM_INPUT_ELEMENT_FORMAT_MATRIX_4x4;
-        input->class  = DM_INPUT_ELEMENT_CLASS_PER_INSTANCE;
-        input->stride = sizeof(inst_vertex);
-        input->offset = offsetof(inst_vertex, obj_model);
-
-        input++;
-
-        dm_strcpy(input->name, "OBJ_NORMAL");
-        input->format = DM_INPUT_ELEMENT_FORMAT_MATRIX_4x4;
-        input->class  = DM_INPUT_ELEMENT_CLASS_PER_INSTANCE;
-        input->stride = sizeof(inst_vertex);
-        input->offset = offsetof(inst_vertex, obj_norm);
-#endif
         desc.input_assembler.input_element_count = 3;
 
         desc.input_assembler.topology = DM_INPUT_TOPOLOGY_TRIANGLE_LIST;
@@ -277,11 +264,11 @@ bool dm_application_init(dm_context* context)
         dm_strcpy(rt_pipe_desc.hit_groups[0].path, "assets/rt_shader.cso");
         rt_pipe_desc.hit_groups[0].flags |= DM_RT_PIPE_HIT_GROUP_FLAG_CLOSEST;
 
-        rt_pipe_desc.descriptor_groups[0].descriptors[0] = DM_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE;
-        rt_pipe_desc.descriptor_groups[0].descriptors[1] = DM_DESCRIPTOR_TYPE_WRITE_TEXTURE;
-        rt_pipe_desc.descriptor_groups[0].descriptors[2] = DM_DESCRIPTOR_TYPE_CONSTANT_BUFFER;
-        rt_pipe_desc.descriptor_groups[0].count    = 3;
-        rt_pipe_desc.descriptor_group_count = 1;
+        rt_pipe_desc.global_descriptor_groups[0].descriptors[0] = DM_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE;
+        rt_pipe_desc.global_descriptor_groups[0].descriptors[1] = DM_DESCRIPTOR_TYPE_WRITE_TEXTURE;
+        rt_pipe_desc.global_descriptor_groups[0].descriptors[2] = DM_DESCRIPTOR_TYPE_CONSTANT_BUFFER;
+        rt_pipe_desc.global_descriptor_groups[0].count          = 3;
+        rt_pipe_desc.global_descriptor_group_count              = 1;
 
         //if(!dm_renderer_create_raytracing_pipeline(rt_pipe_desc, &app_data->rt_pipe, context)) return false;
     }
@@ -289,17 +276,17 @@ bool dm_application_init(dm_context* context)
     // compute pipeline
     {
         dm_storage_buffer_desc b_desc = { 0 };
-        b_desc.write        = false;
-        b_desc.size         = COMPUTE_BUFFER_COUNT * sizeof(int);
-        b_desc.element_size = sizeof(int);
-        b_desc.stride       = sizeof(int);
-        b_desc.data         = app_data->read_buffer;
+        b_desc.write        = true;
+        b_desc.size         = MAX_INSTANCES * sizeof(transform);
+        b_desc.stride       = sizeof(transform);
+        b_desc.data         = app_data->transforms;
 
-        if(!dm_renderer_create_storage_buffer(b_desc, &app_data->compute_sb, context)) return false;
+        if(!dm_renderer_create_storage_buffer(b_desc, &app_data->transform_sb, context)) return false;
 
-        b_desc.write = true;
-        b_desc.data  = app_data->write_buffer;
-        if(!dm_renderer_create_storage_buffer(b_desc, &app_data->compute_sb2, context)) return false;
+        b_desc.size         = MAX_INSTANCES * sizeof(instance);
+        b_desc.stride       = sizeof(instance);
+        b_desc.data         = NULL;
+        if(!dm_renderer_create_storage_buffer(b_desc, &app_data->model_sb, context)) return false;
 
         dm_compute_pipeline_desc desc = { 0 };
 #ifdef DM_DIRECTX12
@@ -308,7 +295,7 @@ bool dm_application_init(dm_context* context)
         dm_strcpy(desc.shader.path, "assets/compute_shader.spv");
 #endif
 
-        desc.descriptor_groups[0].descriptors[0]  = DM_DESCRIPTOR_TYPE_READ_STORAGE_BUFFER;
+        desc.descriptor_groups[0].descriptors[0]  = DM_DESCRIPTOR_TYPE_WRITE_STORAGE_BUFFER;
         desc.descriptor_groups[0].descriptors[1]  = DM_DESCRIPTOR_TYPE_WRITE_STORAGE_BUFFER;
         desc.descriptor_groups[0].count           = 2;
         desc.descriptor_groups[0].flags          |= DM_DESCRIPTOR_GROUP_FLAG_COMPUTE_SHADER;
@@ -419,6 +406,7 @@ bool dm_application_update(dm_context* context)
     if(!dm_renderer_get_blas_gpu_address(app_data->acceleration_structure, CUBE_BLAS, &app_data->blas_addresses[CUBE_BLAS], context)) return false;
 
     // update models
+#if 0
     for(uint32_t i=0; i<MAX_INSTANCES; i++)
     {
         app_data->angles[i] += 60.f * context->delta;
@@ -442,7 +430,7 @@ bool dm_application_update(dm_context* context)
         dm_memcpy(app_data->raytracing_instances[i].transform, app_data->instances[i].obj_model, sizeof(float) * 3 * 4);
         app_data->raytracing_instances[i].blas_address = app_data->blas_addresses[CUBE_BLAS];
     }
-
+#endif
     // gui
     static float quad_color[] = { 0.1f,0.1f,0.7f,1.f };
     static float quad_border_color[] = { 0.f,0.f,0.f,1.f };
@@ -467,19 +455,18 @@ bool dm_application_render(dm_context* context)
 {
     application_data* app_data = context->app_data;
 
-    // compute first
+    gui_update_buffers(app_data->gui_context, context);
+
+    // update the transforms and compute model matrices
     dm_compute_command_bind_compute_pipeline(app_data->compute_pipe, context);
-    dm_compute_command_bind_storage_buffer(app_data->compute_sb,  0,0, context);
-    dm_compute_command_bind_storage_buffer(app_data->compute_sb2, 1,0, context);
+    dm_compute_command_bind_storage_buffer(app_data->transform_sb, 0,0, context);
+    dm_compute_command_bind_storage_buffer(app_data->model_sb, 1,0, context);
     dm_compute_command_bind_descriptor_group(0,2,0, context);
     dm_compute_command_dispatch(1024,1,1, context);
 
-    // render after
-    dm_render_command_update_vertex_buffer(app_data->instances, sizeof(app_data->instances), app_data->instb, context);
-    dm_render_command_update_storage_buffer(app_data->instances, sizeof(app_data->instances), app_data->sb, context);
     dm_render_command_update_acceleration_structure(app_data->raytracing_instances, sizeof(app_data->raytracing_instances), MAX_INSTANCES, app_data->acceleration_structure, context);
-    gui_update_buffers(app_data->gui_context, context);
 
+    // render after
     dm_render_command_begin_render_pass(0.2f,0.5f,0.7f,1.f, context);
 
     // object rendering
@@ -487,11 +474,10 @@ bool dm_application_render(dm_context* context)
 
     dm_render_command_bind_raster_pipeline(app_data->raster_pipe, context);
     dm_render_command_bind_constant_buffer(app_data->cb, 0,0, context);
-    dm_render_command_bind_storage_buffer(app_data->sb,  1,0, context);
+    dm_render_command_bind_storage_buffer(app_data->model_sb, 1,0, context);
     dm_render_command_bind_descriptor_group(0,2,0, context);
 
     dm_render_command_bind_vertex_buffer(app_data->vb, 0, context);
-    //dm_render_command_bind_vertex_buffer(app_data->instb, 1, context);
     dm_render_command_bind_index_buffer(app_data->ib, context);
 
     dm_render_command_draw_instanced_indexed(MAX_INSTANCES,0, _countof(cube_indices),0, 0, context);

@@ -7,11 +7,6 @@ typedef struct vertex_t
     float color[4];
 } vertex;
 
-typedef struct inst_vertex_t
-{
-    dm_mat4 obj_model;
-    dm_mat4 obj_norm;
-} inst_vertex;
 
 const vertex triangle[] = {
     { { -0.5f,-0.5f,0.f }, { 0,0,1 }, { 1.f,0.f,0.f,1.f } },

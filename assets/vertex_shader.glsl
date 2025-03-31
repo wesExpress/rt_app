@@ -1,10 +1,5 @@
 #version 450
 
-layout(std140, binding=0) uniform UniformBufferObject
-{
-    mat4 view_projection;
-} ubo;
-
 layout(location = 0) in vec3 position;
 layout(location = 1) in vec3 in_normal;
 layout(location = 2) in vec4 in_color;
@@ -12,15 +7,20 @@ layout(location = 2) in vec4 in_color;
 layout(location = 0) out vec3 out_normal;
 layout(location = 1) out vec4 out_color;
 
-struct inst
+struct instance
 {
     mat4 model;
     mat4 normal;
 };
 
-layout(set=0, binding=1) buffer test_buffer
+layout(std140, binding=0) uniform UniformBufferObject
 {
-    inst instances[];
+    mat4 view_projection;
+} ubo;
+
+layout(set=0, binding=1) buffer instance_buffer 
+{
+    instance instances[];
 };
 
 void main()
