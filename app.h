@@ -4,12 +4,7 @@
 #include "dm.h"
 #include "rendering/raster_pipeline.h"
 #include "rendering/rt_pipeline.h"
-
-typedef struct simple_camera_t
-{
-    dm_vec3 pos, forward, up;
-    dm_mat4 view, proj;
-} simple_camera;
+#include "camera.h"
 
 #define MAX_INSTANCES 10000
 typedef struct transform_t
@@ -30,8 +25,6 @@ typedef struct application_data_t
     raster_pipeline_data raster_data;
     rt_pipeline_data     rt_data;
 
-    dm_raytracing_instance raytracing_instances[MAX_INSTANCES];
-
     void* gui_context;
     uint8_t font16, font32;
 
@@ -40,14 +33,16 @@ typedef struct application_data_t
 
     transform transforms[MAX_INSTANCES];
     instance  instances[MAX_INSTANCES];
+    dm_raytracing_instance raytracing_instances[MAX_INSTANCES];
 
     simple_camera camera;
-    dm_mat4       vp;
 
     dm_mat4 gui_proj;
 
     dm_timer frame_timer, fps_timer;
     uint16_t frame_count;
+
+    bool ray_trace;
 } application_data;
 
 #endif

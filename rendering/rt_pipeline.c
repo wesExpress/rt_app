@@ -57,6 +57,11 @@ bool rt_pipeline_update(dm_context* context)
 
     if(!dm_renderer_get_blas_gpu_address(app_data->rt_data.acceleration_structure, CUBE_BLAS, &app_data->rt_data.blas_addresses[CUBE_BLAS], context)) return false;
 
+    for(uint32_t i=0; i<MAX_INSTANCES; i++)
+    {
+        app_data->raytracing_instances[i].blas_address = app_data->rt_data.blas_addresses[CUBE_BLAS];
+    }
+
     return true;
 }
 

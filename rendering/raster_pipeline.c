@@ -32,7 +32,7 @@ bool raster_pipeline_init(dm_context* context)
     {
         dm_constant_buffer_desc desc = { 0 };
         desc.size = sizeof(dm_mat4);
-        desc.data = app_data->vp;
+        desc.data = app_data->camera.vp;
 
         if(!dm_renderer_create_constant_buffer(desc, &app_data->raster_data.cb, context)) return false;
     }
@@ -125,7 +125,7 @@ bool raster_pipeline_init(dm_context* context)
         if(!dm_renderer_create_storage_buffer(b_desc, &app_data->raster_data.instance_cb, context)) return false;
     }
 
-    // compute pipeline
+    // === compute pipeline ===
     {
         dm_compute_pipeline_desc desc = { 0 };
 #ifdef DM_DIRECTX12
@@ -163,7 +163,7 @@ bool raster_pipeline_render(dm_context* context)
     dm_compute_command_dispatch(1024,1,1, context);
 
     // object rendering
-    dm_render_command_update_constant_buffer(app_data->vp, sizeof(dm_mat4), app_data->raster_data.cb, context);
+    dm_render_command_update_constant_buffer(app_data->camera.vp, sizeof(dm_mat4), app_data->raster_data.cb, context);
 
     dm_render_command_bind_raster_pipeline(app_data->raster_data.pipeline, context);
     dm_render_command_bind_constant_buffer(app_data->raster_data.cb, 0,0, context);
