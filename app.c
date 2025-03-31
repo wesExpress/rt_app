@@ -4,7 +4,7 @@
 
 #include <stdio.h>
 
-#define MAX_INSTANCES 100000
+#define MAX_INSTANCES 10000
 #define INDEX_TYPE DM_INDEX_BUFFER_INDEX_TYPE_UINT32
 #define CUBE_BLAS 0
 #define WORLD_SCALE 100.f
@@ -93,6 +93,7 @@ transform init_transform(float world_scale, dm_context* context)
     t.orientation[1] = dm_random_float(context);
     t.orientation[2] = dm_random_float(context);
     t.orientation[3] = 1.f;
+    dm_quat_norm(t.orientation, t.orientation);
 
     return t;
 }
