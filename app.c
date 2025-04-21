@@ -1,9 +1,10 @@
 #include "app.h"
 #include "rendering/gui.h"
+#include "rendering/debug_pipeline.h"
 
 #include <stdio.h>
 
-#define WORLD_SCALE 100.f
+#define WORLD_SCALE 5.f 
 
 void dm_application_setup(dm_context_init_packet* init_packet)
 {
@@ -21,9 +22,9 @@ transform init_transform(float world_scale, dm_context* context)
     t.position[1] = dm_random_float(context) * world_scale - world_scale * 0.5f;
     t.position[2] = dm_random_float(context) * world_scale - world_scale * 0.5f;
 
-    t.scale[0] = dm_random_float(context);
-    t.scale[1] = dm_random_float(context);
-    t.scale[2] = dm_random_float(context);
+    t.scale[0] = dm_random_float(context) * 2.5f;
+    t.scale[1] = dm_random_float(context) * 2.5f;
+    t.scale[2] = dm_random_float(context) * 2.5f;
 
     t.orientation[0] = dm_random_float(context);
     t.orientation[1] = dm_random_float(context);
@@ -42,16 +43,16 @@ bool dm_application_init(dm_context* context)
     for(uint32_t i=0; i<MAX_INSTANCES; i++)
     {
         app_data->transforms[i] = init_transform(WORLD_SCALE, context);
-
-        app_data->raytracing_instances[i].blas_address = 0;
-        app_data->raytracing_instances[i].id = i;
     }
 
     // === camera ===
-    camera_init(&app_data->camera, context);
+    dm_vec3 pos = { 5,5,5 };
+    dm_vec3 forward = { -1,-1,-1 };
+
+    camera_init(pos, forward, &app_data->camera, context);
 
     if(!raster_pipeline_init(context)) return false;
-    if(!rt_pipeline_init(app_data->raster_data.vb, app_data->raster_data.ib, context)) return false;
+    if(!rt_pipeline_init(context)) return false;
 
     // misc
     dm_timer_start(&app_data->frame_timer, context);
@@ -79,6 +80,8 @@ bool dm_application_init(dm_context* context)
         if(!gui_load_font("assets/JetBrainsMono-Regular.ttf", 16, &app_data->font16, app_data->gui_context, context)) return false;
         if(!gui_load_font("assets/JetBrainsMono-Regular.ttf", 32, &app_data->font32, app_data->gui_context, context)) return false;
     }
+
+    if(!debug_pipeline_init(context)) return false;
 
     return true;
 }
@@ -129,9 +132,37 @@ bool dm_application_update(dm_context* context)
     gui_draw_text(110.f,160.f, app_data->frame_time_text, frame_timer_color, app_data->font32, app_data->gui_context);
     gui_draw_text(110.f,210.f, t, fps_color, app_data->font16, app_data->gui_context); 
 
+    // draw lines
+#ifdef DEBUG_RAYS
+#define XDIM 20
+#define YDIM 40
+    for(uint8_t x=0; x<XDIM; x++)
+    {
+        for(uint8_t y=0; y<YDIM; y++)
+        {
+            dm_vec2 launch_index = { x,y };
+            dm_vec2 dims = { XDIM,YDIM };
+
+            dm_vec2 coords = { launch_index[0]/dims[0], launch_index[1]/dims[1] };
+            dm_vec2_scale(coords, 2.f, coords);
+            dm_vec2_sub_scalar(coords, 1.f, coords);
+
+            dm_vec4 target;
+            dm_mat4_mul_vec4(app_data->camera.inv_proj, (dm_vec4){ coords[0],coords[1],1.f,1.f }, target);
+            dm_mat4_mul_vec4(app_data->camera.inv_view, (dm_vec4){ target[0],target[1],target[2],0.f }, target);
+
+            dm_vec3 o = { 0,0,2 };
+            dm_vec3 d = { target[0],target[1],target[2] };
+            dm_vec4 c = { target[0],target[1],target[2],1 };
+            debug_pipeline_draw_line(o,d,10,c, context);
+        }
+    }
+#endif
+
     // various updates
     if(!raster_pipeline_update(context)) return false;
     if(!rt_pipeline_update(context))     return false;
+    if(!debug_pipeline_update(context))  return false;
 
     if(dm_input_key_just_pressed(DM_KEY_SPACE, context)) app_data->ray_trace = !app_data->ray_trace;
 
@@ -158,6 +189,8 @@ bool dm_application_render(dm_context* context)
 
     // gui 
     gui_render(app_data->gui_context, context);
+
+    debug_pipeline_render(context);
 
     // 
     dm_render_command_end_render_pass(context);

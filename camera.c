@@ -1,15 +1,18 @@
 #include "camera.h"
 
-void camera_init(simple_camera* camera, dm_context* context)
+void camera_init(float* pos, float* forward, simple_camera* camera, dm_context* context)
 {
-    camera->pos[2] = 3.f;
+    dm_memcpy(camera->pos, pos, sizeof(dm_vec3));
+    dm_vec3_norm(forward, camera->forward);
     camera->up[1]  = 1.f;
-    dm_vec3_negate(camera->pos, camera->forward);
     
     dm_mat_view(camera->pos, camera->forward, camera->up, camera->view);
     dm_mat_perspective(DM_MATH_DEG_TO_RAD * 75.f, (float)context->renderer.width / (float)context->renderer.height, 0.1f, 1000.f, camera->proj);
 
     dm_mat4_mul_mat4(camera->view, camera->proj, camera->vp);
+
+    dm_mat4_inverse(camera->view, camera->inv_view);
+    dm_mat4_inverse(camera->proj, camera->inv_proj);
 }
 
 void camera_update(simple_camera* camera, dm_context* context)
@@ -45,7 +48,7 @@ void camera_update(simple_camera* camera, dm_context* context)
     dm_mat_view(camera->pos, target, camera->up, camera->view);
 
     dm_mat4_mul_mat4(camera->view, camera->proj, camera->vp);
-#ifdef DM_DIRECTX12
-    dm_mat4_transpose(camera->vp, camera->vp);
-#endif
+
+    dm_mat4_inverse(camera->view, camera->inv_view);
+    dm_mat4_inverse(camera->proj, camera->inv_proj);
 }

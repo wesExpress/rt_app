@@ -13,6 +13,7 @@ SET(SOURCES
     rendering/gui.c
     rendering/raster_pipeline.c
     rendering/rt_pipeline.c
+    rendering/debug_pipeline.c
 )
 
 ADD_EXECUTABLE(${PROJECT_NAME} ${SOURCES})

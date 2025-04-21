@@ -7,9 +7,9 @@
 
 typedef struct vertex_t
 {
-    float pos[3];
-    float normal[3];
-    float color[4];
+    dm_vec4 pos;
+    dm_vec4 normal;
+    dm_vec4 color;
 } vertex;
 
 static const vertex triangle[] = {
@@ -17,6 +17,8 @@ static const vertex triangle[] = {
     { {  0.5f,-0.5f,0.f }, { 0,0,1 }, { 0.f,1.f,0.f,1.f } },
     { {  0.f,  0.5f,0.f }, { 0,0,1 }, { 0.f,0.f,1.f,1.f } }
 };
+
+static const uint32_t triangle_indices[] = { 0,1,2 };
 
 static const vertex quad[] = {
     { { -0.5f,-0.5f,0.f }, { 0,0,1 }, { 1.f,0.f,0.f,1.f } },
