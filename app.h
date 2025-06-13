@@ -7,7 +7,7 @@
 #include "rendering/debug_pipeline.h"
 #include "camera.h"
 
-#define MAX_INSTANCES 3
+#define MAX_INSTANCES 100
 typedef struct transform_t
 {
     dm_vec4 position;

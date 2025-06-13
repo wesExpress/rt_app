@@ -2,10 +2,11 @@
 #include "../app.h"
 #include "../data.h"
 
+
 #ifndef DM_DEBUG
 DM_INLINE
 #endif
-bool create_mesh(const vertex* vertices, uint32_t vertex_count, const uint32_t* indices, uint32_t index_count, dm_resource_handle* v_handle, dm_resource_handle* i_handle, dm_context* context)
+bool create_mesh(const vertex* vertices, uint32_t vertex_count, const index_t* indices, uint32_t index_count, dm_resource_handle* v_handle, dm_resource_handle* i_handle, dm_context* context)
 {
     dm_vertex_buffer_desc v_desc = {
         .size=sizeof(vertex) * vertex_count,
@@ -15,9 +16,9 @@ bool create_mesh(const vertex* vertices, uint32_t vertex_count, const uint32_t* 
     };
 
     dm_index_buffer_desc i_desc = {
-        .size=sizeof(uint32_t) * index_count,
-        .element_size=sizeof(uint32_t),
-        .index_type=DM_INDEX_BUFFER_INDEX_TYPE_UINT32,
+        .size=sizeof(index_t) * index_count,
+        .element_size=sizeof(index_t),
+        .index_type=INDEX_TYPE,
         .data=(void*)indices
     };
 
@@ -92,16 +93,9 @@ bool raster_pipeline_init(dm_context* context)
 #endif
         };
 
-        // descriptors 
-        dm_descriptor_group descriptor_group = {
-            .descriptors = { DM_DESCRIPTOR_TYPE_CONSTANT_BUFFER, DM_DESCRIPTOR_TYPE_READ_STORAGE_BUFFER },
-            .count=2, .flags=DM_DESCRIPTOR_GROUP_FLAG_VERTEX_SHADER
-        };
-
         dm_raster_pipeline_desc desc = { 
             .input_assembler=input_assembler,
             .rasterizer=rasterizer_desc,
-            .descriptor_groups[0]=descriptor_group, .descriptor_group_count=1,
             .viewport.type=DM_VIEWPORT_TYPE_DEFAULT, .scissor.type=DM_SCISSOR_TYPE_DEFAULT,
             .depth_stencil=true
         };
@@ -140,12 +134,6 @@ bool raster_pipeline_init(dm_context* context)
         dm_strcpy(desc.shader.path, "assets/compute_shader.spv");
 #endif
 
-        desc.descriptor_groups[0].descriptors[0]  = DM_DESCRIPTOR_TYPE_WRITE_STORAGE_BUFFER;
-        desc.descriptor_groups[0].descriptors[1]  = DM_DESCRIPTOR_TYPE_WRITE_STORAGE_BUFFER;
-        desc.descriptor_groups[0].count           = 2;
-        desc.descriptor_groups[0].flags          |= DM_DESCRIPTOR_GROUP_FLAG_COMPUTE_SHADER;
-        desc.descriptor_group_count = 1;
-
         if(!dm_compute_create_compute_pipeline(desc, &app_data->raster_data.compute_pipeline, context)) return false;
     }
 
@@ -162,21 +150,21 @@ bool raster_pipeline_render(dm_context* context)
     application_data* app_data = context->app_data;
 
     // update the transforms and compute model matrices
+    app_data->raster_data.compute_data.instance_buffer  = app_data->raster_data.instance_cb.descriptor_index;
+    app_data->raster_data.compute_data.transform_buffer = app_data->raster_data.transform_sb.descriptor_index;
+
     dm_compute_command_bind_compute_pipeline(app_data->raster_data.compute_pipeline, context);
-    dm_compute_command_bind_storage_buffer(app_data->raster_data.transform_sb, 0,0, context);
-    dm_compute_command_bind_storage_buffer(app_data->raster_data.instance_cb, 1,0, context);
-    dm_compute_command_bind_descriptor_group(0,2,0, context);
+    dm_compute_command_set_root_constants(0,2,0, &app_data->raster_data.compute_data, context);
     dm_compute_command_dispatch(1024,1,1, context);
 
     // object rendering
+    app_data->raster_data.render_data.scene_cb        = app_data->raster_data.cb.descriptor_index;
+    app_data->raster_data.render_data.instance_buffer = app_data->raster_data.instance_cb.descriptor_index;
+
     dm_mat4_transpose(app_data->camera.vp, app_data->camera.vp);
     dm_render_command_update_constant_buffer(app_data->camera.vp, sizeof(dm_mat4), app_data->raster_data.cb, context);
-
     dm_render_command_bind_raster_pipeline(app_data->raster_data.pipeline, context);
-    dm_render_command_bind_constant_buffer(app_data->raster_data.cb, 0,0, context);
-    dm_render_command_bind_storage_buffer(app_data->raster_data.instance_cb, 1,0, context);
-    dm_render_command_bind_descriptor_group(0,2,0, context);
-
+    dm_render_command_set_root_constants(0,2,0, &app_data->raster_data.render_data, context);
     dm_render_command_bind_vertex_buffer(app_data->raster_data.vb_tri, 0, context);
     dm_render_command_bind_index_buffer(app_data->raster_data.ib_tri, context);
     dm_render_command_draw_instanced_indexed(MAX_INSTANCES,0, _countof(triangle_indices),0, 0, context);

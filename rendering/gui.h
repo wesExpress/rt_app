@@ -3,6 +3,7 @@
 
 #include "dm.h"
 
+
 typedef struct gui_style_t
 {
     uint8_t text_padding_l, text_padding_r;

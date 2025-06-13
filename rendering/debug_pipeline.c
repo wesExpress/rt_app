@@ -63,16 +63,9 @@ bool debug_pipeline_init(dm_context* context)
 #endif
         };
 
-        // descriptors 
-        dm_descriptor_group descriptor_group = {
-            .descriptors = { DM_DESCRIPTOR_TYPE_CONSTANT_BUFFER },
-            .count=1, .flags=DM_DESCRIPTOR_GROUP_FLAG_VERTEX_SHADER
-        };
-
         dm_raster_pipeline_desc desc = { 
             .input_assembler=input_assembler,
             .rasterizer=rasterizer_desc,
-            .descriptor_groups[0]=descriptor_group, .descriptor_group_count=1,
             .viewport.type=DM_VIEWPORT_TYPE_DEFAULT, .scissor.type=DM_SCISSOR_TYPE_DEFAULT,
             .depth_stencil=true
         };
@@ -124,10 +117,6 @@ bool debug_pipeline_render(dm_context* context)
         dm_render_command_bind_raster_pipeline(app_data->debug_data.pipeline, context);
         dm_render_command_bind_vertex_buffer(app_data->debug_data.vb, 0, context);
         dm_render_command_bind_index_buffer(app_data->debug_data.ib, context);
-
-        dm_render_command_bind_constant_buffer(app_data->raster_data.cb, 0,0, context);
-        dm_render_command_bind_descriptor_group(0,1,0, context);
-
         dm_render_command_draw_instanced_indexed(app_data->debug_data.vertex_count / 2,0, app_data->debug_data.index_count,0, 0, context);
     }
 

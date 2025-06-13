@@ -13,8 +13,14 @@ struct instance
 
 #define IDENTITY float4x4(1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1)
 
-RWStructuredBuffer<transform> transforms : register(u0);
-RWStructuredBuffer<instance>  instances  : register(u1);
+struct render_resources
+{
+    uint transform_buffer;
+    uint instance_buffer;
+};
+
+ConstantBuffer<render_resources> resources : register(b0);
+
 
 matrix matrix_translate(float4 position)
 {
@@ -90,6 +96,9 @@ void main(uint3 group_id : SV_GroupID, uint3 thread_id : SV_DispatchThreadID, ui
 {
     const int index = thread_id.x;
 
+    RWStructuredBuffer<transform> transforms = ResourceDescriptorHeap[resources.transform_buffer];
+    RWStructuredBuffer<instance>  instances  = ResourceDescriptorHeap[resources.instance_buffer]; 
+
     transform t = transforms[index];
 
     matrix model = IDENTITY;
@@ -100,9 +109,9 @@ void main(uint3 group_id : SV_GroupID, uint3 thread_id : SV_DispatchThreadID, ui
 
     model = mul(translation, mul(rotation, scaling));
 
-    float3 quat_rotate = float3(0,0.001f,0);
-
-    transforms[index].orientation = update_orientation(t.orientation, quat_rotate);
     instances[index].model = transpose(model);
+
+    float3 quat_rotate = float3(0,0.001f,0);
+    transforms[index].orientation = update_orientation(t.orientation, quat_rotate);
 }
 

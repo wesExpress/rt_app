@@ -10,17 +10,26 @@ struct VS_OUTPUT
     float4 color    : COLOR1;
 };
 
-cbuffer ConstantBuffer : register(b0)
+struct scene_data
 {
     matrix proj;
 };
+
+struct render_resources
+{
+    uint scene_cb;
+};
+
+ConstantBuffer<render_resources> resources : register(b0);
 
 VS_OUTPUT main(VS_INPUT input)
 {
     VS_OUTPUT output;
 
+    ConstantBuffer<scene_data> scene_cb = ResourceDescriptorHeap[resources.scene_cb];
+
     output.position = float4(input.position, 0, 1.f);
-    output.position = mul(output.position, proj);
+    output.position = mul(output.position, scene_cb.proj);
     output.color    = input.color;
 
     return output;

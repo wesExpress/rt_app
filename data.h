@@ -3,7 +3,13 @@
 
 #include "dm.h"
 
+#if 1
+#define INDEX_TYPE DM_INDEX_BUFFER_INDEX_TYPE_UINT16
+typedef uint16_t index_t;
+#else
 #define INDEX_TYPE DM_INDEX_BUFFER_INDEX_TYPE_UINT32
+typedef uint32_t index_t;
+#endif
 
 typedef struct vertex_t
 {
@@ -13,12 +19,12 @@ typedef struct vertex_t
 } vertex;
 
 static const vertex triangle[] = {
-    { { -0.5f,-0.5f,0.f }, { 0,0,1 }, { 1.f,0.f,0.f,1.f } },
-    { {  0.5f,-0.5f,0.f }, { 0,0,1 }, { 0.f,1.f,0.f,1.f } },
-    { {  0.f,  0.5f,0.f }, { 0,0,1 }, { 0.f,0.f,1.f,1.f } }
+    { {  0.f, -0.5f,0.f }, { 0,0,1 }, { 0.f,1.f,0.f,1.f } },
+    { { -0.5f, 0.5f,0.f }, { 0,0,1 }, { 1.f,0.f,0.f,1.f } },
+    { {  0.5f, 0.5f,0.f }, { 0,0,1 }, { 0.f,0.f,1.f,1.f } }
 };
 
-static const uint32_t triangle_indices[] = { 0,1,2 };
+static const index_t triangle_indices[] = { 0,1,2 };
 
 static const vertex quad[] = {
     { { -0.5f,-0.5f,0.f }, { 0,0,1 }, { 1.f,0.f,0.f,1.f } },
@@ -27,7 +33,7 @@ static const vertex quad[] = {
     { {  0.5f, 0.5f,0.f }, { 0,0,1 }, { 1.f,1.f,0.f,1.f } }
 };
 
-static const uint32_t quad_indices[] = { 0,1,2, 3,2,1 };
+static const index_t quad_indices[] = { 0,1,2, 3,2,1 };
 
 static const vertex cube[] = {
     // front face
@@ -67,7 +73,7 @@ static const vertex cube[] = {
     { {  0.5f,-0.5f,-0.5f }, { 0,-1,0 }, { 0.0f,1.f,1.f,1.f } },  // 23 
 };
 
-static const uint32_t cube_indices[] = {
+static const index_t cube_indices[] = {
     0,1,2, 3,2,1,
 
     4,6,5, 7,5,6,

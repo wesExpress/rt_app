@@ -46,8 +46,8 @@ bool dm_application_init(dm_context* context)
     }
 
     // === camera ===
-    dm_vec3 pos = { 5,5,5 };
-    dm_vec3 forward = { -1,-1,-1 };
+    dm_vec3 pos = { 0,0,6 };
+    dm_vec3 forward = { 0,0,-1 };
 
     camera_init(pos, forward, &app_data->camera, context);
 
@@ -119,8 +119,7 @@ bool dm_application_update(dm_context* context)
     static float quad_color[] = { 0.1f,0.1f,0.7f,1.f };
     static float quad_border_color[] = { 0.f,0.f,0.f,1.f };
 
-    gui_draw_quad(100.f,100.f, 500.f,200.f, quad_color, app_data->gui_context);
-    gui_draw_quad_border(100.f,500.f, 500.f,200.f, quad_color, quad_border_color, app_data->gui_context);
+    gui_draw_quad_border(100.f,100.f, 500.f,200.f, quad_color, quad_border_color, app_data->gui_context);
 
     static const float fps_color[] = { 1.f,1.f,1.f,1.f };
     static const float frame_timer_color[] = { 1.f,1.f,1.f,1.f };

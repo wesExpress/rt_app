@@ -1,5 +1,11 @@
 #include "gui.h"
 
+typedef struct gui_resources_t
+{
+    uint32_t scene_data;
+    uint32_t texture;
+} gui_resources;
+
 typedef struct gui_quad_vertex_t
 {
     float pos[2];
@@ -31,6 +37,9 @@ typedef struct gui_context_t
     gui_style style;
 
     dm_resource_handle quad_pipe, text_pipe, cb;
+
+    gui_resources quad_resources;
+    gui_resources text_resources[MAX_FONT_COUNT];
 } gui_context;
 
 bool gui_init(gui_style style, uint8_t font_count, void** gui_ctxt, dm_context* context)
@@ -117,13 +126,6 @@ bool gui_init(gui_style style, uint8_t font_count, void** gui_ctxt, dm_context* 
         desc.viewport.type = DM_VIEWPORT_TYPE_DEFAULT;
         desc.scissor.type  = DM_SCISSOR_TYPE_DEFAULT;
 
-        // descriptors
-        desc.descriptor_groups[0].descriptors[0]  = DM_DESCRIPTOR_TYPE_CONSTANT_BUFFER;
-        desc.descriptor_groups[0].count           = 1;
-        desc.descriptor_groups[0].flags          |= DM_DESCRIPTOR_GROUP_FLAG_VERTEX_SHADER;
-        
-        desc.descriptor_group_count = 1;
-
         if(!dm_renderer_create_raster_pipeline(desc, &c->quad_pipe, context)) return false;
     }
 
@@ -172,17 +174,6 @@ bool gui_init(gui_style style, uint8_t font_count, void** gui_ctxt, dm_context* 
 
         desc.viewport.type = DM_VIEWPORT_TYPE_DEFAULT;
         desc.scissor.type  = DM_SCISSOR_TYPE_DEFAULT;
-
-        // descriptors
-        desc.descriptor_groups[0].descriptors[0]  = DM_DESCRIPTOR_TYPE_CONSTANT_BUFFER;
-        desc.descriptor_groups[0].flags          |= DM_DESCRIPTOR_GROUP_FLAG_VERTEX_SHADER;
-        desc.descriptor_groups[0].count           = 1;
-
-        desc.descriptor_groups[1].descriptors[0]  = DM_DESCRIPTOR_TYPE_TEXTURE;
-        desc.descriptor_groups[1].flags          |= DM_DESCRIPTOR_GROUP_FLAG_PIXEL_SHADER;
-        desc.descriptor_groups[1].count           = 1;
-
-        desc.descriptor_group_count = 2;
 
         desc.sampler = true;
 
@@ -382,13 +373,13 @@ void gui_render(void* gui_ctxt, dm_context* context)
 {
     gui_context* c = gui_ctxt;
 
+    c->quad_resources.scene_data = c->cb.descriptor_index;
+
     // quads
     if(c->quad_vertex_count)
     {
         dm_render_command_bind_raster_pipeline(c->quad_pipe, context);
-        dm_render_command_bind_constant_buffer(c->cb, 0, 0, context);
-        dm_render_command_bind_descriptor_group(0, 1, 0, context);
-
+        dm_render_command_set_root_constants(0,2,0, &c->quad_resources, context);
         dm_render_command_bind_vertex_buffer(c->quad_vb, 0, context);
         dm_render_command_draw_instanced(1,0, c->quad_vertex_count,0, context);
 
@@ -397,17 +388,17 @@ void gui_render(void* gui_ctxt, dm_context* context)
 
     // text rendering
     dm_render_command_bind_raster_pipeline(c->text_pipe, context);
-    dm_render_command_bind_constant_buffer(c->cb, 0,0, context);
-    dm_render_command_bind_descriptor_group(0, 1, 0, context);
     
     // fonts
     for(uint8_t i=0; i<c->font_count; i++)
     {
         if(c->text_vertex_count[i]==0) continue;
 
+        c->text_resources[i].scene_data = c->cb.descriptor_index;
+        c->text_resources[i].texture    = c->fonts[i].texture_handle.descriptor_index;
+
+        dm_render_command_set_root_constants(0,2,0, &c->text_resources[i], context);
         dm_render_command_bind_vertex_buffer(c->font_vb[i], 0, context);
-        dm_render_command_bind_texture(c->fonts[i].texture_handle, 0, 0, context);
-        dm_render_command_bind_descriptor_group(1, 1, 1, context);
         dm_render_command_draw_instanced(1,0, c->text_vertex_count[i],0, context);
 
         c->text_vertex_count[i] = 0;
