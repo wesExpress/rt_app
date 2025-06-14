@@ -11,16 +11,21 @@ struct instance
     matrix normal;
 };
 
+struct scene_data
+{
+    double delta;
+};
+
 #define IDENTITY float4x4(1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1)
 
 struct render_resources
 {
     uint transform_buffer;
     uint instance_buffer;
+    uint scene_data;
 };
 
 ConstantBuffer<render_resources> resources : register(b0);
-
 
 matrix matrix_translate(float4 position)
 {
@@ -98,6 +103,7 @@ void main(uint3 group_id : SV_GroupID, uint3 thread_id : SV_DispatchThreadID, ui
 
     RWStructuredBuffer<transform> transforms = ResourceDescriptorHeap[resources.transform_buffer];
     RWStructuredBuffer<instance>  instances  = ResourceDescriptorHeap[resources.instance_buffer]; 
+    ConstantBuffer<scene_data>    scene_cb   = ResourceDescriptorHeap[resources.scene_data];
 
     transform t = transforms[index];
 
@@ -111,7 +117,6 @@ void main(uint3 group_id : SV_GroupID, uint3 thread_id : SV_DispatchThreadID, ui
 
     instances[index].model = transpose(model);
 
-    float3 quat_rotate = float3(0,0.001f,0);
+    float3 quat_rotate = float3(0,scene_cb.delta,0);
     transforms[index].orientation = update_orientation(t.orientation, quat_rotate);
 }
-

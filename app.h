@@ -2,24 +2,12 @@
 #define __APP_H__
 
 #include "dm.h"
+
+#include "entities.h"
 #include "rendering/raster_pipeline.h"
 #include "rendering/rt_pipeline.h"
 #include "rendering/debug_pipeline.h"
 #include "camera.h"
-
-#define MAX_INSTANCES 100
-typedef struct transform_t
-{
-    dm_vec4 position;
-    dm_vec4 scale;
-    dm_quat orientation;
-} transform;
-
-typedef struct instance_t 
-{
-    dm_mat4 model;
-    dm_mat4 normal;
-} instance;
 
 typedef struct application_data_t
 {
@@ -33,9 +21,8 @@ typedef struct application_data_t
     char       fps_text[512];
     char       frame_time_text[512];
 
-    transform transforms[MAX_INSTANCES];
-    //instance  instances[MAX_INSTANCES];
-    dm_raytracing_instance raytracing_instances[MAX_INSTANCES];
+    transform transforms[MAX_ENTITIES];
+    dm_raytracing_instance raytracing_instances[MAX_ENTITIES];
 
     simple_camera camera;
 

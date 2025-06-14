@@ -1,6 +1,7 @@
 #include "rt_pipeline.h"
 #include "../app.h"
 #include "../data.h"
+#include "../entities.h"
 
 typedef struct ray_payload_t
 {
@@ -39,7 +40,7 @@ bool rt_pipeline_init(dm_context* context)
             .shader_path = "assets/rt_shader.cso",
             .raygen = "ray_generation", .miss = "miss",
             .hit_groups[0]=hit_group, .hit_group_count=1,
-            .payload_size=sizeof(ray_payload), .max_depth=1, .max_instance_count=MAX_INSTANCES
+            .payload_size=sizeof(ray_payload), .max_depth=1, .max_instance_count=MAX_ENTITIES
         };
 
         if(!dm_renderer_create_raytracing_pipeline(rt_pipe_desc, &app_data->rt_data.pipeline, context)) return false;
@@ -74,7 +75,7 @@ bool rt_pipeline_init(dm_context* context)
     }
 
     // instances with correct blas
-    for(uint32_t i=0; i<MAX_INSTANCES; i++)
+    for(uint32_t i=0; i<MAX_ENTITIES; i++)
     {
         // misc
         app_data->raytracing_instances[i].blas_address = app_data->rt_data.blas_addresses[CUBE_BLAS];
@@ -111,7 +112,7 @@ bool rt_pipeline_init(dm_context* context)
     // === top-level ===
     {
         dm_tlas_desc tlas_desc = { 
-            .instance_count=MAX_INSTANCES, .instances=app_data->raytracing_instances
+            .instance_count=MAX_ENTITIES, .instances=app_data->raytracing_instances
         };
 
         if(!dm_renderer_create_tlas(tlas_desc, &app_data->rt_data.tlas, context)) return false; 
@@ -126,6 +127,23 @@ bool rt_pipeline_init(dm_context* context)
         if(!dm_renderer_create_constant_buffer(desc, &app_data->rt_data.cb, context)) return false;
     }
 
+    // material buffer
+    {
+        for(uint32_t i=0; i<MAX_ENTITIES; i++)
+        {
+            app_data->rt_data.materials[i].vb_index = app_data->raster_data.vb_tri.descriptor_index;
+            app_data->rt_data.materials[i].ib_index = app_data->raster_data.ib_tri.descriptor_index;
+        }
+
+        dm_storage_buffer_desc desc = { 0 };
+        desc.size = sizeof(material) * MAX_ENTITIES;
+        desc.stride = sizeof(material);
+        desc.write = false;
+        desc.data = app_data->rt_data.materials;
+
+        if(!dm_renderer_create_storage_buffer(desc, &app_data->rt_data.material_buffer, context)) return false;
+    }
+
     return true;
 }
 
@@ -134,7 +152,7 @@ bool rt_pipeline_update(dm_context* context)
     application_data* app_data = context->app_data;
 
     // TODO: offput onto gpu or something? but how?
-    for(uint32_t i=0; i<MAX_INSTANCES; i++)
+    for(uint32_t i=0; i<MAX_ENTITIES; i++)
     {
         // misc
         app_data->raytracing_instances[i].blas_address = app_data->rt_data.blas_addresses[TRI_BLAS];
@@ -178,6 +196,7 @@ bool rt_pipeline_render(dm_context* context)
     app_data->rt_data.resources.acceleration_structure = app_data->rt_data.tlas.descriptor_index;
     app_data->rt_data.resources.image                  = app_data->rt_data.image.descriptor_index;
     app_data->rt_data.resources.constant_buffer        = app_data->rt_data.cb.descriptor_index;
+    app_data->rt_data.resources.material_buffer        = app_data->rt_data.material_buffer.descriptor_index;
 
 #ifdef DM_DIRECTX12
     dm_mat4_transpose(app_data->camera.inv_view, app_data->rt_data.scene_data.inv_view);
@@ -189,13 +208,12 @@ bool rt_pipeline_render(dm_context* context)
     dm_memcpy(app_data->rt_data.scene_data.origin, app_data->camera.pos, sizeof(dm_vec3));
     
     dm_render_command_update_constant_buffer(&app_data->rt_data.scene_data, sizeof(scene_cb), app_data->rt_data.cb, context);
-    dm_render_command_update_tlas(app_data->raytracing_instances, sizeof(app_data->raytracing_instances), MAX_INSTANCES, app_data->rt_data.tlas, context);
+    dm_render_command_update_tlas(app_data->raytracing_instances, sizeof(app_data->raytracing_instances), MAX_ENTITIES, app_data->rt_data.tlas, context);
 
     dm_render_command_bind_raytracing_pipeline(app_data->rt_data.pipeline, context);
-    dm_render_command_set_root_constants(0,3,0, &app_data->rt_data.resources, context);
+    dm_render_command_set_root_constants(0,sizeof(app_data->rt_data.resources) / sizeof(uint32_t),0, &app_data->rt_data.resources, context);
     dm_render_command_dispatch_rays(context->renderer.width, context->renderer.height, app_data->rt_data.pipeline, context);
     dm_render_command_copy_image_to_screen(app_data->rt_data.image, context);
 
     return true;
 }
-

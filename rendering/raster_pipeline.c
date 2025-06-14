@@ -2,7 +2,6 @@
 #include "../app.h"
 #include "../data.h"
 
-
 #ifndef DM_DEBUG
 DM_INLINE
 #endif
@@ -43,8 +42,8 @@ bool raster_pipeline_init(dm_context* context)
     // === constant buffer ===
     {
         dm_constant_buffer_desc desc = { 0 };
-        desc.size = sizeof(dm_mat4);
-        desc.data = app_data->camera.vp;
+        desc.size = sizeof(raster_scene_data);
+        desc.data = &app_data->raster_data.scene_data;
 
         if(!dm_renderer_create_constant_buffer(desc, &app_data->raster_data.cb, context)) return false;
     }
@@ -107,7 +106,7 @@ bool raster_pipeline_init(dm_context* context)
     {
         dm_storage_buffer_desc b_desc = { 0 };
         b_desc.write        = true;
-        b_desc.size         = MAX_INSTANCES * sizeof(transform);
+        b_desc.size         = MAX_ENTITIES * sizeof(transform);
         b_desc.stride       = sizeof(transform);
         b_desc.data         = app_data->transforms;
 
@@ -118,7 +117,7 @@ bool raster_pipeline_init(dm_context* context)
     {
         dm_storage_buffer_desc b_desc = { 0 };
         b_desc.write        = true;
-        b_desc.size         = MAX_INSTANCES * sizeof(instance);
+        b_desc.size         = MAX_ENTITIES * sizeof(instance);
         b_desc.stride       = sizeof(instance);
         b_desc.data         = NULL;
 
@@ -135,6 +134,12 @@ bool raster_pipeline_init(dm_context* context)
 #endif
 
         if(!dm_compute_create_compute_pipeline(desc, &app_data->raster_data.compute_pipeline, context)) return false;
+
+        dm_constant_buffer_desc buffer = { 0 };
+        buffer.data = &app_data->raster_data.c_data;
+        buffer.size = sizeof(app_data->raster_data.c_data);
+
+        if(!dm_renderer_create_constant_buffer(buffer, &app_data->raster_data.compute_cb, context)) return false;
     }
 
     return true;
@@ -142,6 +147,12 @@ bool raster_pipeline_init(dm_context* context)
 
 bool raster_pipeline_update(dm_context* context)
 {
+    application_data* app_data = context->app_data;
+
+    app_data->raster_data.c_data.delta_t = 0.0005f;
+    
+    dm_mat4_transpose(app_data->camera.vp, app_data->raster_data.scene_data.view_proj);
+
     return true;
 }
 
@@ -152,22 +163,23 @@ bool raster_pipeline_render(dm_context* context)
     // update the transforms and compute model matrices
     app_data->raster_data.compute_data.instance_buffer  = app_data->raster_data.instance_cb.descriptor_index;
     app_data->raster_data.compute_data.transform_buffer = app_data->raster_data.transform_sb.descriptor_index;
+    app_data->raster_data.compute_data.scene_cb         = app_data->raster_data.compute_cb.descriptor_index;
 
+    dm_compute_command_update_constant_buffer(&app_data->raster_data.c_data, sizeof(compute_data), app_data->raster_data.compute_cb, context);
     dm_compute_command_bind_compute_pipeline(app_data->raster_data.compute_pipeline, context);
-    dm_compute_command_set_root_constants(0,2,0, &app_data->raster_data.compute_data, context);
+    dm_compute_command_set_root_constants(0,3,0, &app_data->raster_data.compute_data, context);
     dm_compute_command_dispatch(1024,1,1, context);
 
     // object rendering
     app_data->raster_data.render_data.scene_cb        = app_data->raster_data.cb.descriptor_index;
     app_data->raster_data.render_data.instance_buffer = app_data->raster_data.instance_cb.descriptor_index;
 
-    dm_mat4_transpose(app_data->camera.vp, app_data->camera.vp);
-    dm_render_command_update_constant_buffer(app_data->camera.vp, sizeof(dm_mat4), app_data->raster_data.cb, context);
+    dm_render_command_update_constant_buffer(&app_data->raster_data.scene_data, sizeof(raster_scene_data), app_data->raster_data.cb, context);
     dm_render_command_bind_raster_pipeline(app_data->raster_data.pipeline, context);
     dm_render_command_set_root_constants(0,2,0, &app_data->raster_data.render_data, context);
     dm_render_command_bind_vertex_buffer(app_data->raster_data.vb_tri, 0, context);
     dm_render_command_bind_index_buffer(app_data->raster_data.ib_tri, context);
-    dm_render_command_draw_instanced_indexed(MAX_INSTANCES,0, _countof(triangle_indices),0, 0, context);
+    dm_render_command_draw_instanced_indexed(MAX_ENTITIES,0, _countof(triangle_indices),0, 0, context);
 
     return true;
 }

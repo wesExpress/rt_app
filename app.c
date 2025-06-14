@@ -40,7 +40,7 @@ bool dm_application_init(dm_context* context)
     application_data* app_data = context->app_data;
 
     // initialize instances
-    for(uint32_t i=0; i<MAX_INSTANCES; i++)
+    for(uint32_t i=0; i<MAX_ENTITIES; i++)
     {
         app_data->transforms[i] = init_transform(WORLD_SCALE, context);
     }
@@ -125,7 +125,7 @@ bool dm_application_update(dm_context* context)
     static const float frame_timer_color[] = { 1.f,1.f,1.f,1.f };
 
     char t[512];
-    sprintf(t, "Instance count: %u", MAX_INSTANCES);
+    sprintf(t, "Instance count: %u", MAX_ENTITIES);
 
     gui_draw_text(110.f,110.f, app_data->fps_text,        fps_color, app_data->font16, app_data->gui_context);
     gui_draw_text(110.f,160.f, app_data->frame_time_text, frame_timer_color, app_data->font32, app_data->gui_context);

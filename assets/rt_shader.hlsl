@@ -9,11 +9,25 @@ struct scene_data
 	float4 origin;
 };
 
+struct vertex
+{
+    float4 position;
+    float4 normal;
+    float4 color;
+};
+
+struct material
+{
+    uint vb_index;
+    uint ib_index;
+};
+
 struct render_resources
 {
     uint acceleration_structure;
     uint image;
     uint scene_data;
+    uint material_buffer;
 };
 
 ConstantBuffer<render_resources> resources : register(b0);
@@ -53,11 +67,29 @@ void ray_generation()
 [shader("miss")]
 void miss(inout ray_payload p)
 {
-    p.color.rgb = float3(0,0,0);
+    p.color.rgb = float3(0.2f,0.5f,0.7f);
 }
 
 [shader("closesthit")]
 void closest_hit(inout ray_payload p, BuiltInTriangleIntersectionAttributes attrs)
 {
-    p.color.rgb = float3(1,1,1);
+    StructuredBuffer<material> material_buffer = ResourceDescriptorHeap[resources.material_buffer];
+
+    StructuredBuffer<vertex> vertex_buffer = ResourceDescriptorHeap[material_buffer[InstanceIndex()].vb_index];
+    StructuredBuffer<uint>   index_buffer  = ResourceDescriptorHeap[material_buffer[InstanceIndex()].ib_index];
+    
+    const uint tri_index = PrimitiveIndex();
+
+    float3 barycentrics = float3(
+        1 - attrs.barycentrics.x - attrs.barycentrics.y,
+        attrs.barycentrics.x,
+        attrs.barycentrics.y
+    );
+
+    float3 color = 
+        vertex_buffer[index_buffer[tri_index] + 0].color.rgb * barycentrics.x +
+        vertex_buffer[index_buffer[tri_index] + 1].color.rgb * barycentrics.y +
+        vertex_buffer[index_buffer[tri_index] + 2].color.rgb * barycentrics.z;  
+
+    p.color.rgb = color;
 }
