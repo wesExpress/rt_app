@@ -163,17 +163,15 @@ bool rt_pipeline_update(dm_context* context)
 
         // calculate transform
         dm_mat4 model;
-        dm_mat4 rotation;
 
         dm_mat4_identity(model);
 
         transform t = app_data->transforms[i];
 
-        dm_mat4_rotate_from_quat(t.orientation, rotation);
-
         dm_mat_scale(model, t.scale, model);
-        dm_mat4_mul_mat4(model, rotation, model);
+        dm_mat_rotate_quat(model, t.orientation, model);
         dm_mat_translate(model, t.position, model);
+
         dm_mat4_transpose(model, model);
 
         dm_memcpy(app_data->raytracing_instances[i].transform, model, sizeof(float) * 3 * 4);
@@ -186,6 +184,23 @@ bool rt_pipeline_update(dm_context* context)
         app_data->transforms[i] = t;
     }
 
+    // constant buffer data
+#ifdef DM_DIRECTX12
+    dm_mat4_transpose(app_data->camera.inv_view, app_data->rt_data.scene_data.inv_view);
+    dm_mat4_transpose(app_data->camera.inv_proj, app_data->rt_data.scene_data.inv_proj);
+    dm_mat4_transpose(app_data->camera.inv_vp,   app_data->rt_data.scene_data.inv_view_proj);
+#elif defined(DM_VULKAN)
+    dm_memcpy(app_data->rt_data.scene_data.inv_view, app_data->camera.inv_view, sizeof(dm_mat4));
+    dm_memcpy(app_data->rt_data.scene_data.inv_proj, app_data->camera.inv_proj, sizeof(dm_mat4));
+    dm_memcpy(app_data->rt_data.scene_data.inv_vp,   app_data->camera.inv_view_proj, sizeof(dm_mat4));
+#endif
+
+    dm_memcpy(app_data->rt_data.scene_data.origin, app_data->camera.pos, sizeof(dm_vec3));
+
+    app_data->rt_data.scene_data.sky_color[0] = 0.2f;
+    app_data->rt_data.scene_data.sky_color[1] = 0.5f;
+    app_data->rt_data.scene_data.sky_color[2] = 0.7f;
+
     return true;
 }
 
@@ -193,25 +208,19 @@ bool rt_pipeline_render(dm_context* context)
 {
     application_data* app_data = context->app_data;
 
+    // resource indices
     app_data->rt_data.resources.acceleration_structure = app_data->rt_data.tlas.descriptor_index;
     app_data->rt_data.resources.image                  = app_data->rt_data.image.descriptor_index;
     app_data->rt_data.resources.constant_buffer        = app_data->rt_data.cb.descriptor_index;
     app_data->rt_data.resources.material_buffer        = app_data->rt_data.material_buffer.descriptor_index;
 
-#ifdef DM_DIRECTX12
-    dm_mat4_transpose(app_data->camera.inv_view, app_data->rt_data.scene_data.inv_view);
-    dm_mat4_transpose(app_data->camera.inv_proj, app_data->rt_data.scene_data.inv_proj);
-#elif defined(DM_VULKAN)
-    dm_memcpy(app_data->rt_data.scene_data.inv_view, app_data->camera.inv_view, sizeof(dm_mat4));
-    dm_memcpy(app_data->rt_data.scene_data.inv_proj, app_data->camera.inv_proj, sizeof(dm_mat4));
-#endif
-    dm_memcpy(app_data->rt_data.scene_data.origin, app_data->camera.pos, sizeof(dm_vec3));
-    
+    // update render objects
     dm_render_command_update_constant_buffer(&app_data->rt_data.scene_data, sizeof(scene_cb), app_data->rt_data.cb, context);
     dm_render_command_update_tlas(app_data->raytracing_instances, sizeof(app_data->raytracing_instances), MAX_ENTITIES, app_data->rt_data.tlas, context);
 
+    // render
     dm_render_command_bind_raytracing_pipeline(app_data->rt_data.pipeline, context);
-    dm_render_command_set_root_constants(0,sizeof(app_data->rt_data.resources) / sizeof(uint32_t),0, &app_data->rt_data.resources, context);
+    dm_render_command_set_root_constants(0,4,0, &app_data->rt_data.resources, context);
     dm_render_command_dispatch_rays(context->renderer.width, context->renderer.height, app_data->rt_data.pipeline, context);
     dm_render_command_copy_image_to_screen(app_data->rt_data.image, context);
 

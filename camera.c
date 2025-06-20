@@ -13,6 +13,7 @@ void camera_init(float* pos, float* forward, simple_camera* camera, dm_context* 
 
     dm_mat4_inverse(camera->view, camera->inv_view);
     dm_mat4_inverse(camera->proj, camera->inv_proj);
+    dm_mat4_inverse(camera->vp,   camera->inv_vp);
 }
 
 void camera_update(simple_camera* camera, dm_context* context)
@@ -39,9 +40,10 @@ void camera_update(simple_camera* camera, dm_context* context)
         move[0] = 1.f;
     }
 
+#define MOVE_SPEED 1.f
     dm_vec3_norm(move, move);
-    dm_vec3_scale(move, 5.f * context->delta, move);
-    if(dm_vec3_mag2(move)>0) dm_vec3_add_vec3(camera->pos, move, camera->pos);
+    dm_vec3_scale(move, MOVE_SPEED * context->delta, move);
+    if(dm_vec3_mag2(move)>=0) dm_vec3_add_vec3(camera->pos, move, camera->pos);
 
     dm_vec3 target = { 0 };
     dm_vec3_add_vec3(camera->pos, camera->forward, target);
@@ -51,4 +53,5 @@ void camera_update(simple_camera* camera, dm_context* context)
 
     dm_mat4_inverse(camera->view, camera->inv_view);
     dm_mat4_inverse(camera->proj, camera->inv_proj);
+    dm_mat4_inverse(camera->vp,   camera->inv_vp);
 }

@@ -7,7 +7,9 @@
 typedef struct scene_cb_t
 {
     dm_mat4 inv_view, inv_proj;
+    dm_mat4 inv_view_proj;
     dm_vec4 origin;
+    dm_vec4 sky_color;
 } scene_cb;
 
 typedef struct rt_resources_t

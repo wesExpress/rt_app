@@ -5,8 +5,9 @@ struct ray_payload
 
 struct scene_data
 {
-    matrix inv_view, inv_proj;
+    matrix inv_view, inv_proj, inv_vp;
 	float4 origin;
+    float4 sky_color;
 };
 
 struct vertex
@@ -32,6 +33,25 @@ struct render_resources
 
 ConstantBuffer<render_resources> resources : register(b0);
 
+inline float3 get_ray_direction(const float3 origin, const matrix inv_proj, const matrix inv_view)
+{
+    const uint2 launch_index = DispatchRaysIndex().xy;
+    const uint2 screen_dimensions = DispatchRaysDimensions().xy;
+    const float  aspect_ratio = float(screen_dimensions.x) / float(screen_dimensions.y);
+
+    // get screen position
+    const float2 ndc  = (float2(launch_index) + 0.5f) / float2(screen_dimensions);
+    float2 screen_pos = ndc * 2.f - 1.f;
+    screen_pos.y *= -1.f;
+
+    // world position
+    float3 world_pos = mul(float4(screen_pos, -1,1), inv_proj).xyz;
+    world_pos        = mul(float4(world_pos, 1), inv_view).xyz;
+
+    // direction
+    return normalize(world_pos - origin);
+}
+
 [shader("raygeneration")]
 void ray_generation()
 {
@@ -39,23 +59,15 @@ void ray_generation()
     RWTexture2D<float4> image             = ResourceDescriptorHeap[resources.image];
     ConstantBuffer<scene_data> scene_cb   = ResourceDescriptorHeap[resources.scene_data];
 
-    uint2 launch_index      = DispatchRaysIndex().xy;
-    uint2 screen_dimensions = DispatchRaysDimensions().xy;
-
-    float2 coords = float2(launch_index) / float2(screen_dimensions);
-    coords = coords * 2.f - 1.f;
-    coords.y *= -1.f;
-
-    float4 target = mul(scene_cb.inv_proj, float4(coords, 0.f,1.f));
-    target.xyz /= target.w;
-    float3 direction = normalize(mul(scene_cb.inv_view, float4(target.xyz, 0)).xyz);
-
     ray_payload p;
     p.color.rgb = float3(1,0,1);
+    
+    const uint2 launch_index = DispatchRaysIndex().xy;
+    const float3 origin      = scene_cb.origin.xyz;
 
     RayDesc ray;
-    ray.Origin    = scene_cb.origin.xyz;
-    ray.Direction = direction;
+    ray.Origin    = origin;
+    ray.Direction = get_ray_direction(origin, scene_cb.inv_proj, scene_cb.inv_view);
     ray.TMin      = 0.001f;
     ray.TMax      = 1000.f;
 
@@ -67,7 +79,9 @@ void ray_generation()
 [shader("miss")]
 void miss(inout ray_payload p)
 {
-    p.color.rgb = float3(0.2f,0.5f,0.7f);
+    ConstantBuffer<scene_data> scene_cb = ResourceDescriptorHeap[resources.scene_data];
+
+    p.color.rgb = scene_cb.sky_color.rgb;
 }
 
 [shader("closesthit")]

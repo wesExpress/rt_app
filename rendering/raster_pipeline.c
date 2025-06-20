@@ -149,7 +149,7 @@ bool raster_pipeline_update(dm_context* context)
 {
     application_data* app_data = context->app_data;
 
-    app_data->raster_data.c_data.delta_t = 0.0005f;
+    app_data->raster_data.c_data.delta_t = 0.001f;
     
     dm_mat4_transpose(app_data->camera.vp, app_data->raster_data.scene_data.view_proj);
 
