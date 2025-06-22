@@ -5,10 +5,26 @@ struct transform
     float4 orientation;
 };
 
+struct physics
+{
+    float3 w;
+};
+
 struct instance
 {
     matrix model;
     matrix normal;
+};
+
+struct rt_instance
+{
+    float4 transform[3];
+
+    uint     id : 24;
+    uint     mask : 8;
+    uint     sbt_offset : 24;
+    uint     flags : 8;
+    uint64_t blas;
 };
 
 struct scene_data
@@ -21,8 +37,10 @@ struct scene_data
 struct render_resources
 {
     uint transform_buffer;
+    uint physics_buffer;
     uint instance_buffer;
-    uint scene_data;
+    uint rt_instance_buffer;
+    uint rt_blas_buffer;
 };
 
 ConstantBuffer<render_resources> resources : register(b0);
@@ -101,22 +119,36 @@ void main(uint3 group_id : SV_GroupID, uint3 thread_id : SV_DispatchThreadID, ui
 {
     const int index = thread_id.x;
 
-    RWStructuredBuffer<transform> transforms = ResourceDescriptorHeap[resources.transform_buffer];
-    RWStructuredBuffer<instance>  instances  = ResourceDescriptorHeap[resources.instance_buffer]; 
-    ConstantBuffer<scene_data>    scene_cb   = ResourceDescriptorHeap[resources.scene_data];
+    RWStructuredBuffer<transform>   transforms     = ResourceDescriptorHeap[resources.transform_buffer];
+    RWStructuredBuffer<physics>     phys           = ResourceDescriptorHeap[resources.physics_buffer];
+    RWStructuredBuffer<instance>    instances      = ResourceDescriptorHeap[resources.instance_buffer]; 
+    RWStructuredBuffer<rt_instance> rt_instances   = ResourceDescriptorHeap[resources.rt_instance_buffer];
+    RWStructuredBuffer<uint64_t>    rt_blas_buffer = ResourceDescriptorHeap[resources.rt_blas_buffer];
 
     transform t = transforms[index];
+    physics   p = phys[index];
 
     matrix model = IDENTITY;
 
-    matrix translation = matrix_translate(t.position);
-    matrix rotation    = matrix_rotate(t.orientation);
     matrix scaling     = matrix_scale(t.scale);
+    matrix rotation    = matrix_rotate(t.orientation);
+    matrix translation = matrix_translate(t.position);
 
-    model = mul(translation, mul(rotation, scaling));
+    model = mul(scaling,     model);
+    model = mul(rotation,    model);
+    model = mul(translation, model);
 
     instances[index].model = transpose(model);
 
-    float3 quat_rotate = float3(0,scene_cb.delta,0);
+    rt_instances[index].transform[0] = model[0];
+    rt_instances[index].transform[1] = model[1];
+    rt_instances[index].transform[2] = model[2];
+
+    //rt_instances[index].blas = rt_blas_buffer[0];
+    //rt_instances[index].sbt_offset = 0;
+    rt_instances[index].id = index;
+    //rt_instances[index].mask = 0xFF;
+
+    float3 quat_rotate = p.w;
     transforms[index].orientation = update_orientation(t.orientation, quat_rotate);
 }

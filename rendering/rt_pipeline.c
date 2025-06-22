@@ -3,14 +3,14 @@
 #include "../data.h"
 #include "../entities.h"
 
+#define CUBE_BLAS 0
+#define TRI_BLAS  1
+#define QUAD_BLAS 2
+
 typedef struct ray_payload_t
 {
     dm_vec4 color;
 } ray_payload;
-
-#define CUBE_BLAS 0
-#define TRI_BLAS  1
-#define QUAD_BLAS 2
 
 bool rt_pipeline_init(dm_context* context)
 {
@@ -68,51 +68,46 @@ bool rt_pipeline_init(dm_context* context)
             .index_count=_countof(quad_indices), .index_buffer=app_data->raster_data.ib_quad, .index_type=INDEX_TYPE
         };
         if(!dm_renderer_create_blas(blas_quad, &app_data->rt_data.quad_blas, context)) return false;
+    }
 
+    // === blas buffer ===
+    {
         if(!dm_renderer_get_blas_gpu_address(app_data->rt_data.cube_blas,     &app_data->rt_data.blas_addresses[CUBE_BLAS], context)) return false;
         if(!dm_renderer_get_blas_gpu_address(app_data->rt_data.triangle_blas, &app_data->rt_data.blas_addresses[TRI_BLAS],  context)) return false;
         if(!dm_renderer_get_blas_gpu_address(app_data->rt_data.quad_blas,     &app_data->rt_data.blas_addresses[QUAD_BLAS], context)) return false;
+
+        dm_storage_buffer_desc desc = { 0 };
+        desc.write  = false;
+        desc.size   = sizeof(size_t) * 10;
+        desc.stride = sizeof(size_t);
+        desc.data   = app_data->rt_data.blas_addresses;
+
+        if(!dm_renderer_create_storage_buffer(desc, &app_data->rt_data.blas_buffer, context)) return false;
     }
 
-    // instances with correct blas
-    for(uint32_t i=0; i<MAX_ENTITIES; i++)
+    // fill in and create rt instance buffer
     {
-        // misc
-        app_data->raytracing_instances[i].blas_address = app_data->rt_data.blas_addresses[CUBE_BLAS];
+        for(uint32_t i=0; i<MAX_ENTITIES; i++)
+        {
+            app_data->entities.rt_instances[i].id = i;
+            app_data->entities.rt_instances[i].sbt_offset = 0;
+            app_data->entities.rt_instances[i].mask = 0xFF;
+            app_data->entities.rt_instances[i].blas_address = app_data->rt_data.blas_addresses[CUBE_BLAS];
+        }
+        
+        dm_storage_buffer_desc desc = { 0 };
+        desc.write  = true;
+        desc.size   = MAX_ENTITIES * sizeof(dm_raytracing_instance);
+        desc.stride = sizeof(dm_raytracing_instance);
+        desc.data   = app_data->entities.rt_instances;
 
-        app_data->raytracing_instances[i].id = i;
-        app_data->raytracing_instances[i].sbt_offset = 0;
-        app_data->raytracing_instances[i].mask = 0xFF;
-
-        // calculate transform
-        dm_mat4 model;
-        dm_mat4 rotation;
-
-        dm_mat4_identity(model);
-
-        transform t = app_data->transforms[i];
-
-        dm_mat4_rotate_from_quat(t.orientation, rotation);
-
-        dm_mat_scale(model, t.scale, model);
-        dm_mat4_mul_mat4(model, rotation, model);
-        dm_mat_translate(model, t.position, model);
-        dm_mat4_transpose(model, model);
-
-        dm_memcpy(app_data->raytracing_instances[i].transform, model, sizeof(float) * 3 * 4);
-
-        dm_quat delta_rot, new_rot;
-        dm_vec3 rotate = { 0,0.001f,0 };
-        dm_vec3_mul_quat(rotate, t.orientation, delta_rot);
-        dm_quat_add_quat(t.orientation, delta_rot, new_rot);
-        dm_quat_norm(new_rot, t.orientation);
-        app_data->transforms[i] = t;
+        if(!dm_renderer_create_storage_buffer(desc, &app_data->entities.rt_instance_sb, context)) return false;
     }
 
     // === top-level ===
     {
         dm_tlas_desc tlas_desc = { 
-            .instance_count=MAX_ENTITIES, .instances=app_data->raytracing_instances
+            .instance_count=MAX_ENTITIES, .instance_buffer=app_data->entities.rt_instance_sb
         };
 
         if(!dm_renderer_create_tlas(tlas_desc, &app_data->rt_data.tlas, context)) return false; 
@@ -127,62 +122,12 @@ bool rt_pipeline_init(dm_context* context)
         if(!dm_renderer_create_constant_buffer(desc, &app_data->rt_data.cb, context)) return false;
     }
 
-    // material buffer
-    {
-        for(uint32_t i=0; i<MAX_ENTITIES; i++)
-        {
-            app_data->rt_data.materials[i].vb_index = app_data->raster_data.vb_tri.descriptor_index;
-            app_data->rt_data.materials[i].ib_index = app_data->raster_data.ib_tri.descriptor_index;
-        }
-
-        dm_storage_buffer_desc desc = { 0 };
-        desc.size = sizeof(material) * MAX_ENTITIES;
-        desc.stride = sizeof(material);
-        desc.write = false;
-        desc.data = app_data->rt_data.materials;
-
-        if(!dm_renderer_create_storage_buffer(desc, &app_data->rt_data.material_buffer, context)) return false;
-    }
-
     return true;
 }
 
 bool rt_pipeline_update(dm_context* context)
 {
     application_data* app_data = context->app_data;
-
-    // TODO: offput onto gpu or something? but how?
-    for(uint32_t i=0; i<MAX_ENTITIES; i++)
-    {
-        // misc
-        app_data->raytracing_instances[i].blas_address = app_data->rt_data.blas_addresses[TRI_BLAS];
-
-        app_data->raytracing_instances[i].id = i;
-        app_data->raytracing_instances[i].sbt_offset = 0;
-        app_data->raytracing_instances[i].mask = 0xFF;
-
-        // calculate transform
-        dm_mat4 model;
-
-        dm_mat4_identity(model);
-
-        transform t = app_data->transforms[i];
-
-        dm_mat_scale(model, t.scale, model);
-        dm_mat_rotate_quat(model, t.orientation, model);
-        dm_mat_translate(model, t.position, model);
-
-        dm_mat4_transpose(model, model);
-
-        dm_memcpy(app_data->raytracing_instances[i].transform, model, sizeof(float) * 3 * 4);
-
-        dm_quat delta_rot, new_rot;
-        dm_vec3 rotate = { 0,0.001f,0 };
-        dm_vec3_mul_quat(rotate, t.orientation, delta_rot);
-        dm_quat_add_quat(t.orientation, delta_rot, new_rot);
-        dm_quat_norm(new_rot, t.orientation);
-        app_data->transforms[i] = t;
-    }
 
     // constant buffer data
 #ifdef DM_DIRECTX12
@@ -212,11 +157,11 @@ bool rt_pipeline_render(dm_context* context)
     app_data->rt_data.resources.acceleration_structure = app_data->rt_data.tlas.descriptor_index;
     app_data->rt_data.resources.image                  = app_data->rt_data.image.descriptor_index;
     app_data->rt_data.resources.constant_buffer        = app_data->rt_data.cb.descriptor_index;
-    app_data->rt_data.resources.material_buffer        = app_data->rt_data.material_buffer.descriptor_index;
+    app_data->rt_data.resources.material_buffer        = app_data->entities.material_sb.descriptor_index;
 
     // update render objects
     dm_render_command_update_constant_buffer(&app_data->rt_data.scene_data, sizeof(scene_cb), app_data->rt_data.cb, context);
-    dm_render_command_update_tlas(app_data->raytracing_instances, sizeof(app_data->raytracing_instances), MAX_ENTITIES, app_data->rt_data.tlas, context);
+    dm_render_command_update_tlas(MAX_ENTITIES, app_data->rt_data.tlas, context);
 
     // render
     dm_render_command_bind_raytracing_pipeline(app_data->rt_data.pipeline, context);

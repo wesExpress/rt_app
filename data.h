@@ -3,7 +3,7 @@
 
 #include "dm.h"
 
-#if 1
+#if 0
 #define INDEX_TYPE DM_INDEX_BUFFER_INDEX_TYPE_UINT16
 typedef uint16_t index_t;
 #else

@@ -35,9 +35,9 @@ ConstantBuffer<render_resources> resources : register(b0);
 
 inline float3 get_ray_direction(const float3 origin, const matrix inv_proj, const matrix inv_view)
 {
-    const uint2 launch_index = DispatchRaysIndex().xy;
+    const uint2 launch_index      = DispatchRaysIndex().xy;
     const uint2 screen_dimensions = DispatchRaysDimensions().xy;
-    const float  aspect_ratio = float(screen_dimensions.x) / float(screen_dimensions.y);
+    const float  aspect_ratio     = float(screen_dimensions.x) / float(screen_dimensions.y);
 
     // get screen position
     const float2 ndc  = (float2(launch_index) + 0.5f) / float2(screen_dimensions);
@@ -87,23 +87,30 @@ void miss(inout ray_payload p)
 [shader("closesthit")]
 void closest_hit(inout ray_payload p, BuiltInTriangleIntersectionAttributes attrs)
 {
+    const uint tri_index  = PrimitiveIndex() * 3;
+    const uint inst_index = InstanceIndex();
+
     StructuredBuffer<material> material_buffer = ResourceDescriptorHeap[resources.material_buffer];
-
-    StructuredBuffer<vertex> vertex_buffer = ResourceDescriptorHeap[material_buffer[InstanceIndex()].vb_index];
-    StructuredBuffer<uint>   index_buffer  = ResourceDescriptorHeap[material_buffer[InstanceIndex()].ib_index];
+    StructuredBuffer<vertex>   vertex_buffer   = ResourceDescriptorHeap[material_buffer[inst_index].vb_index];
+    StructuredBuffer<uint>     index_buffer    = ResourceDescriptorHeap[material_buffer[inst_index].ib_index];
     
-    const uint tri_index = PrimitiveIndex();
-
     float3 barycentrics = float3(
         1 - attrs.barycentrics.x - attrs.barycentrics.y,
         attrs.barycentrics.x,
         attrs.barycentrics.y
     );
 
+    uint3 indices = {
+        index_buffer[tri_index + 0],
+        index_buffer[tri_index + 1],
+        index_buffer[tri_index + 2]
+    };
+
     float3 color = 
-        vertex_buffer[index_buffer[tri_index] + 0].color.rgb * barycentrics.x +
-        vertex_buffer[index_buffer[tri_index] + 1].color.rgb * barycentrics.y +
-        vertex_buffer[index_buffer[tri_index] + 2].color.rgb * barycentrics.z;  
+        vertex_buffer[indices[0]].color.rgb * barycentrics.x +
+        vertex_buffer[indices[1]].color.rgb * barycentrics.y +
+        vertex_buffer[indices[2]].color.rgb * barycentrics.z;  
 
     p.color.rgb = color;
 }
+

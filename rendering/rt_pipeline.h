@@ -27,9 +27,9 @@ typedef struct rt_pipeline_data_t
     dm_resource_handle tlas;
     dm_resource_handle vb, ib, cb;
     dm_resource_handle image;
-    dm_resource_handle material_buffer;
+    dm_resource_handle blas_buffer;
 
-    size_t blas_addresses[DM_TLAS_MAX_BLAS];
+    size_t blas_addresses[10];
     material materials[MAX_ENTITIES];
 
     scene_cb scene_data;

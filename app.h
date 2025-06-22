@@ -7,6 +7,7 @@
 #include "rendering/raster_pipeline.h"
 #include "rendering/rt_pipeline.h"
 #include "rendering/debug_pipeline.h"
+
 #include "camera.h"
 
 typedef struct application_data_t
@@ -21,8 +22,11 @@ typedef struct application_data_t
     char       fps_text[512];
     char       frame_time_text[512];
 
-    transform transforms[MAX_ENTITIES];
-    dm_raytracing_instance raytracing_instances[MAX_ENTITIES];
+    //transform transforms[MAX_ENTITIES];
+    //physics   phys[MAX_ENTITIES];
+    //dm_raytracing_instance raytracing_instances[MAX_ENTITIES];
+
+    entity_data entities;
 
     simple_camera camera;
 

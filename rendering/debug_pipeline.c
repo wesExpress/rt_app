@@ -79,7 +79,8 @@ void debug_pipeline_draw_line(dm_vec3 origin, dm_vec3 direction, float length, d
 {
     application_data* app_data = context->app_data;
 
-    debug_vertex v1,v2;
+    debug_vertex v1 = { 0 };
+    debug_vertex v2 = { 0 };
 
     dm_vec3 t, d;
 
@@ -98,12 +99,35 @@ void debug_pipeline_draw_line(dm_vec3 origin, dm_vec3 direction, float length, d
     app_data->debug_data.indices[app_data->debug_data.index_count++] = i+1; 
 }
 
+void debug_pipeline_draw_transform(dm_vec3 origin, dm_quat orientation, float length, dm_context* context)
+{
+    application_data* app_data = context->app_data;
+
+    dm_vec3 x_axis = { 1,0,0 };
+    dm_vec3 y_axis = { 0,1,0 };
+    dm_vec3 z_axis = { 0,0,1 };
+
+    dm_vec4 x_color = { 1,0,0,1 };
+    dm_vec4 y_color = { 0,1,0,1 };
+    dm_vec4 z_color = { 0,0,1,1 };
+
+    dm_vec3_rotate(x_axis, orientation, x_axis);
+    dm_vec3_rotate(y_axis, orientation, y_axis);
+    dm_vec3_rotate(z_axis, orientation, z_axis);
+
+    debug_pipeline_draw_line(origin, x_axis, length, x_color, context);
+    debug_pipeline_draw_line(origin, y_axis, length, y_color, context);
+    debug_pipeline_draw_line(origin, z_axis, length, z_color, context);
+}
+
 bool debug_pipeline_update(dm_context* context)
 {
     application_data* app_data = context->app_data;
     
     dm_render_command_update_vertex_buffer(app_data->debug_data.vertices, sizeof(app_data->debug_data.vertices), app_data->debug_data.vb, context);
     dm_render_command_update_index_buffer(app_data->debug_data.indices, sizeof(app_data->debug_data.indices), app_data->debug_data.ib, context);
+
+    app_data->debug_data.resources.scene_cb = app_data->raster_data.cb.descriptor_index;
 
     return true;
 }
@@ -117,6 +141,7 @@ bool debug_pipeline_render(dm_context* context)
         dm_render_command_bind_raster_pipeline(app_data->debug_data.pipeline, context);
         dm_render_command_bind_vertex_buffer(app_data->debug_data.vb, 0, context);
         dm_render_command_bind_index_buffer(app_data->debug_data.ib, context);
+        dm_render_command_set_root_constants(0,1,0, &app_data->debug_data.resources, context);
         dm_render_command_draw_instanced_indexed(app_data->debug_data.vertex_count / 2,0, app_data->debug_data.index_count,0, 0, context);
     }
 

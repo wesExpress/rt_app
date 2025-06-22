@@ -40,7 +40,7 @@ void camera_update(simple_camera* camera, dm_context* context)
         move[0] = 1.f;
     }
 
-#define MOVE_SPEED 1.f
+#define MOVE_SPEED 5.f
     dm_vec3_norm(move, move);
     dm_vec3_scale(move, MOVE_SPEED * context->delta, move);
     if(dm_vec3_mag2(move)>=0) dm_vec3_add_vec3(camera->pos, move, camera->pos);
