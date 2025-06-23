@@ -58,8 +58,8 @@ bool debug_pipeline_init(dm_context* context)
             .vertex_shader_desc.path="assets/debug_vertex.cso",
             .pixel_shader_desc.path="assets/debug_pixel.cso",
 #elif defined(DM_VULKAN)
-            .vertex_shader_desc.path="assets/debug_shader.spv",
-            .pixel_shader_desc.path="assets/debug_shader.spv",
+            .vertex_shader_desc.path="assets/debug_vertex.spv",
+            .pixel_shader_desc.path="assets/debug_pixel.spv",
 #endif
         };
 

@@ -6,8 +6,6 @@
 
 typedef struct scene_cb_t
 {
-    dm_mat4 inv_view, inv_proj;
-    dm_mat4 inv_view_proj;
     dm_vec4 origin;
     dm_vec4 sky_color;
 } scene_cb;
@@ -18,23 +16,46 @@ typedef struct rt_resources_t
     uint32_t image;
     uint32_t constant_buffer;
     uint32_t material_buffer;
+    uint32_t ray_image;
 } rt_resources;
+
+typedef struct rt_compute_resources_t
+{
+    uint32_t camera_buffer;
+    uint32_t image_data;
+    uint32_t ray_image;
+} rt_compute_resources;
+
+typedef struct rt_camera_data_t
+{
+    dm_mat4 inv_view, inv_proj;
+    dm_vec4 position;
+} rt_camera_data;
+
+typedef struct rt_image_data_t
+{
+    uint32_t width, height;
+} rt_image_data;
 
 typedef struct rt_pipeline_data_t
 {
-    dm_resource_handle pipeline;
+    dm_resource_handle pipeline, compute_pipeline;
     dm_resource_handle cube_blas, triangle_blas, quad_blas;
     dm_resource_handle tlas;
     dm_resource_handle vb, ib, cb;
     dm_resource_handle image;
     dm_resource_handle blas_buffer;
+    dm_resource_handle ray_image, compute_cb, compute_image_cb;
 
     size_t blas_addresses[10];
     material materials[MAX_ENTITIES];
 
     scene_cb scene_data;
+    rt_camera_data camera_data;
+    rt_image_data  image_data;
 
     rt_resources resources;
+    rt_compute_resources compute_resources;
 } rt_pipeline_data;
 
 bool rt_pipeline_init(dm_context* context);

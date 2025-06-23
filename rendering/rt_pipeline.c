@@ -12,11 +12,13 @@ typedef struct ray_payload_t
     dm_vec4 color;
 } ray_payload;
 
+
+
 bool rt_pipeline_init(dm_context* context)
 {
     application_data* app_data = context->app_data;
 
-    // === image ===
+    // === image(s) ===
     {
         dm_texture_desc desc = { 0 };
         desc.format     = DM_TEXTURE_FORMAT_BYTE_4_UNORM;
@@ -26,6 +28,9 @@ bool rt_pipeline_init(dm_context* context)
         desc.write      = true;
 
         if(!dm_renderer_create_texture(desc, &app_data->rt_data.image, context)) return false;
+
+        desc.format = DM_TEXTURE_FORMAT_FLOAT_4;
+        if(!dm_renderer_create_texture(desc, &app_data->rt_data.ray_image, context)) return false;
     }
 
     // === rt pipeline === 
@@ -113,13 +118,31 @@ bool rt_pipeline_init(dm_context* context)
         if(!dm_renderer_create_tlas(tlas_desc, &app_data->rt_data.tlas, context)) return false; 
     }
 
-    // === constant buffer ===
+    // === constant buffer(s) ===
     {
         dm_constant_buffer_desc desc = { 
             .size=sizeof(scene_cb), .data=&app_data->rt_data.scene_data
         };
 
         if(!dm_renderer_create_constant_buffer(desc, &app_data->rt_data.cb, context)) return false;
+
+        desc.size = sizeof(rt_camera_data);
+        desc.data = NULL;
+
+        if(!dm_renderer_create_constant_buffer(desc, &app_data->rt_data.compute_cb, context)) return false;
+
+        desc.size = sizeof(rt_image_data);
+
+        if(!dm_renderer_create_constant_buffer(desc, &app_data->rt_data.compute_image_cb, context)) return false;
+    }
+
+    // === compute pipeline ===
+    {
+        dm_compute_pipeline_desc desc = {  
+            .shader="assets/ray_directions.cso"
+        };
+
+        if(!dm_compute_create_compute_pipeline(desc, &app_data->rt_data.compute_pipeline, context)) return false;
     }
 
     return true;
@@ -131,9 +154,8 @@ bool rt_pipeline_update(dm_context* context)
 
     // constant buffer data
 #ifdef DM_DIRECTX12
-    dm_mat4_transpose(app_data->camera.inv_view, app_data->rt_data.scene_data.inv_view);
-    dm_mat4_transpose(app_data->camera.inv_proj, app_data->rt_data.scene_data.inv_proj);
-    dm_mat4_transpose(app_data->camera.inv_vp,   app_data->rt_data.scene_data.inv_view_proj);
+    dm_mat4_transpose(app_data->camera.inv_view, app_data->rt_data.camera_data.inv_view);
+    dm_mat4_transpose(app_data->camera.inv_proj, app_data->rt_data.camera_data.inv_proj);
 #elif defined(DM_VULKAN)
     dm_memcpy(app_data->rt_data.scene_data.inv_view, app_data->camera.inv_view, sizeof(dm_mat4));
     dm_memcpy(app_data->rt_data.scene_data.inv_proj, app_data->camera.inv_proj, sizeof(dm_mat4));
@@ -141,6 +163,10 @@ bool rt_pipeline_update(dm_context* context)
 #endif
 
     dm_memcpy(app_data->rt_data.scene_data.origin, app_data->camera.pos, sizeof(dm_vec3));
+    dm_memcpy(app_data->rt_data.camera_data.position, app_data->camera.pos, sizeof(dm_vec4));
+
+    app_data->rt_data.image_data.width  = context->renderer.width;
+    app_data->rt_data.image_data.height = context->renderer.height;
 
     app_data->rt_data.scene_data.sky_color[0] = 0.2f;
     app_data->rt_data.scene_data.sky_color[1] = 0.5f;
@@ -153,11 +179,24 @@ bool rt_pipeline_render(dm_context* context)
 {
     application_data* app_data = context->app_data;
 
+    // compute stuff
+    app_data->rt_data.compute_resources.camera_buffer = app_data->rt_data.compute_cb.descriptor_index;
+    app_data->rt_data.compute_resources.image_data    = app_data->rt_data.compute_image_cb.descriptor_index;
+    app_data->rt_data.compute_resources.ray_image     = app_data->rt_data.ray_image.descriptor_index;
+
+    dm_compute_command_update_constant_buffer(&app_data->rt_data.camera_data, sizeof(rt_camera_data), app_data->rt_data.compute_cb, context);
+    dm_compute_command_update_constant_buffer(&app_data->rt_data.image_data, sizeof(rt_image_data), app_data->rt_data.compute_image_cb, context);
+
+    dm_compute_command_bind_compute_pipeline(app_data->rt_data.compute_pipeline, context);
+    dm_compute_command_set_root_constants(0,3,0, &app_data->rt_data.compute_resources, context);
+    dm_compute_command_dispatch(context->renderer.width, context->renderer.height, 1, context);
+
     // resource indices
     app_data->rt_data.resources.acceleration_structure = app_data->rt_data.tlas.descriptor_index;
     app_data->rt_data.resources.image                  = app_data->rt_data.image.descriptor_index;
     app_data->rt_data.resources.constant_buffer        = app_data->rt_data.cb.descriptor_index;
     app_data->rt_data.resources.material_buffer        = app_data->entities.material_sb.descriptor_index;
+    app_data->rt_data.resources.ray_image              = app_data->rt_data.ray_image.descriptor_index;
 
     // update render objects
     dm_render_command_update_constant_buffer(&app_data->rt_data.scene_data, sizeof(scene_cb), app_data->rt_data.cb, context);
@@ -165,7 +204,7 @@ bool rt_pipeline_render(dm_context* context)
 
     // render
     dm_render_command_bind_raytracing_pipeline(app_data->rt_data.pipeline, context);
-    dm_render_command_set_root_constants(0,4,0, &app_data->rt_data.resources, context);
+    dm_render_command_set_root_constants(0,5,0, &app_data->rt_data.resources, context);
     dm_render_command_dispatch_rays(context->renderer.width, context->renderer.height, app_data->rt_data.pipeline, context);
     dm_render_command_copy_image_to_screen(app_data->rt_data.image, context);
 

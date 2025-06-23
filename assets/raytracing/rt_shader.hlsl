@@ -5,7 +5,6 @@ struct ray_payload
 
 struct scene_data
 {
-    matrix inv_view, inv_proj, inv_vp;
 	float4 origin;
     float4 sky_color;
 };
@@ -29,28 +28,10 @@ struct render_resources
     uint image;
     uint scene_data;
     uint material_buffer;
+    uint ray_image;
 };
 
 ConstantBuffer<render_resources> resources : register(b0);
-
-inline float3 get_ray_direction(const float3 origin, const matrix inv_proj, const matrix inv_view)
-{
-    const uint2 launch_index      = DispatchRaysIndex().xy;
-    const uint2 screen_dimensions = DispatchRaysDimensions().xy;
-    const float  aspect_ratio     = float(screen_dimensions.x) / float(screen_dimensions.y);
-
-    // get screen position
-    const float2 ndc  = (float2(launch_index) + 0.5f) / float2(screen_dimensions);
-    float2 screen_pos = ndc * 2.f - 1.f;
-    screen_pos.y *= -1.f;
-
-    // world position
-    float3 world_pos = mul(float4(screen_pos, -1,1), inv_proj).xyz;
-    world_pos        = mul(float4(world_pos, 1), inv_view).xyz;
-
-    // direction
-    return normalize(world_pos - origin);
-}
 
 [shader("raygeneration")]
 void ray_generation()
@@ -58,18 +39,19 @@ void ray_generation()
     RaytracingAccelerationStructure scene = ResourceDescriptorHeap[resources.acceleration_structure];
     RWTexture2D<float4> image             = ResourceDescriptorHeap[resources.image];
     ConstantBuffer<scene_data> scene_cb   = ResourceDescriptorHeap[resources.scene_data];
+    RWTexture2D<float4> ray_image         = ResourceDescriptorHeap[resources.ray_image];
 
     ray_payload p;
-    p.color.rgb = float3(1,0,1);
+    p.color = float4(1,0,1,1);
     
     const uint2 launch_index = DispatchRaysIndex().xy;
     const float3 origin      = scene_cb.origin.xyz;
 
     RayDesc ray;
     ray.Origin    = origin;
-    ray.Direction = get_ray_direction(origin, scene_cb.inv_proj, scene_cb.inv_view);
+    ray.Direction = ray_image[launch_index].xyz;
     ray.TMin      = 0.001f;
-    ray.TMax      = 1000.f;
+    ray.TMax      = 100.f;
 
     TraceRay(scene, RAY_FLAG_NONE, 0xFF, 0,1,0, ray, p);
 
@@ -79,9 +61,9 @@ void ray_generation()
 [shader("miss")]
 void miss(inout ray_payload p)
 {
-    ConstantBuffer<scene_data> scene_cb = ResourceDescriptorHeap[resources.scene_data];
+    ConstantBuffer<scene_data> scene_cb   = ResourceDescriptorHeap[resources.scene_data];
 
-    p.color.rgb = scene_cb.sky_color.rgb;
+    p.color = scene_cb.sky_color;
 }
 
 [shader("closesthit")]

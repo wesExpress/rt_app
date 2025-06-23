@@ -51,7 +51,7 @@ bool init_entities(dm_context* context)
 
     for(uint32_t i=0; i<MAX_ENTITIES; i++)
     {
-        app_data->entities.transforms[i] = init_transform((float)MAX_ENTITIES * 0.1f, context);
+        app_data->entities.transforms[i] = init_transform(50.f, context);
         app_data->entities.phys[i]       = init_physics(context);
 
         app_data->entities.materials[i].vb_index = app_data->raster_data.vb_cube.descriptor_index;
@@ -106,7 +106,7 @@ bool init_entities(dm_context* context)
     {
         dm_compute_pipeline_desc desc = { 0 };
 #ifdef DM_DIRECTX12
-        dm_strcpy(desc.shader.path, "assets/compute_shader.cso");
+        dm_strcpy(desc.shader.path, "assets/update_entities.cso");
 #elif defined(DM_VULKAN)
         dm_strcpy(desc.shader.path, "assets/compute_shader.spv");
 #endif
