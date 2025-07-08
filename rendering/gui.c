@@ -40,6 +40,8 @@ typedef struct gui_context_t
 
     gui_resources quad_resources;
     gui_resources text_resources[MAX_FONT_COUNT];
+
+    gui_proj cb_data;
 } gui_context;
 
 bool gui_init(gui_style style, uint8_t font_count, void** gui_ctxt, dm_context* context)
@@ -75,15 +77,14 @@ bool gui_init(gui_style style, uint8_t font_count, void** gui_ctxt, dm_context* 
 
     // constant buffer
     {
-        dm_mat4 gui_proj = { 0 };
-        dm_mat_ortho(0,(float)context->renderer.width, (float)context->renderer.height,0, -1,1, gui_proj);
+        dm_mat_ortho(0,(float)context->renderer.width, (float)context->renderer.height,0, -1,1, c->cb_data.ortho_proj);
 #ifdef DM_DIRECTX12
-        dm_mat4_transpose(gui_proj, gui_proj);
+        dm_mat4_transpose(c->cb_data.ortho_proj, c->cb_data.ortho_proj);
 #endif
 
         dm_constant_buffer_desc cb_desc = { 0 };
-        cb_desc.size = sizeof(dm_mat4);
-        cb_desc.data = gui_proj;
+        cb_desc.size = sizeof(gui_proj);
+        cb_desc.data = c->cb_data.ortho_proj;
 
         if(!dm_renderer_create_constant_buffer(cb_desc, &c->cb, context)) return false;
     }

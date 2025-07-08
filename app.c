@@ -19,10 +19,6 @@ bool dm_application_init(dm_context* context)
 
     camera_init(pos, forward, &app_data->camera, context);
 
-    if(!raster_pipeline_init(context)) return false;
-    if(!init_entities(context)) return false;
-    if(!rt_pipeline_init(context)) return false;
-
     // misc
     dm_timer_start(&app_data->frame_timer, context);
     dm_timer_start(&app_data->fps_timer, context);
@@ -50,6 +46,10 @@ bool dm_application_init(dm_context* context)
         if(!gui_load_font("assets/fonts/JetBrainsMono-Regular.ttf", 32, &app_data->font32, app_data->gui_context, context)) return false;
     }
 
+    if(!raster_pipeline_init(context)) return false;
+    if(!init_entities(context)) return false;
+    //if(!rt_pipeline_init(context)) return false;
+    if(!init_entity_pipeline(context)) return false;
     if(!debug_pipeline_init(context)) return false;
 
     return true;
@@ -70,26 +70,14 @@ bool dm_application_update(dm_context* context)
     sprintf(app_data->frame_time_text, "Frame time: %0.2lf ms", frame_time);
     dm_timer_start(&app_data->frame_timer, context);
 
-    if(dm_timer_elapsed(&app_data->fps_timer, context) >= 1)
-    {
-        sprintf(app_data->fps_text, "FPS: %u", app_data->frame_count);
-        app_data->frame_count = 0;
-        dm_timer_start(&app_data->fps_timer, context);
-    }
-    else
-    {
-        app_data->frame_count++;
-    }
-
     // camera 
     camera_update(&app_data->camera, context);
 
     // various updates
     if(!raster_pipeline_update(context)) return false;
-    if(!rt_pipeline_update(context))     return false;
+    //if(!rt_pipeline_update(context))     return false;
     if(!debug_pipeline_update(context))  return false;
     
-
     // gui
     static float quad_color[] = { 0.1f,0.1f,0.7f,1.f };
     static float quad_border_color[] = { 0.f,0.f,0.f,1.f };
@@ -113,6 +101,17 @@ bool dm_application_update(dm_context* context)
 
     if(dm_input_key_just_pressed(DM_KEY_SPACE, context)) app_data->ray_trace = !app_data->ray_trace;
 
+    if(dm_timer_elapsed(&app_data->fps_timer, context) >= 1)
+    {
+        sprintf(app_data->fps_text, "FPS: %u", app_data->frame_count);
+        app_data->frame_count = 0;
+        dm_timer_start(&app_data->fps_timer, context);
+    }
+    else
+    {
+        app_data->frame_count++;
+    }
+
     return true;
 }
 
@@ -129,7 +128,7 @@ bool dm_application_render(dm_context* context)
 
     if(app_data->ray_trace)
     {
-        if(!rt_pipeline_render(context)) return false;
+        //if(!rt_pipeline_render(context)) return false;
     }
     else 
     {

@@ -3,7 +3,6 @@
 
 #include "dm.h"
 
-
 typedef struct render_resources_t
 {
     uint32_t scene_cb;

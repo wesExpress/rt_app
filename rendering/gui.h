@@ -3,6 +3,10 @@
 
 #include "dm.h"
 
+typedef struct gui_proj_t
+{
+    dm_mat4 ortho_proj;
+} gui_proj;
 
 typedef struct gui_style_t
 {

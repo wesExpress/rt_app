@@ -1,34 +1,42 @@
 #version 450
 
 layout(location = 0) in vec3 position;
-layout(location = 1) in vec3 in_normal;
-layout(location = 2) in vec4 in_color;
+layout(location = 1) in vec3 vertex_normal;
+layout(location = 2) in vec4 vertex_color;
 
-layout(location = 0) out vec3 out_normal;
-layout(location = 1) out vec4 out_color;
+layout(location = 0) out vec3 fragment_normal;
+layout(location = 1) out vec4 fragment_color;
 
 struct instance
 {
     mat4 model;
-    mat4 normal;
 };
 
-layout(std140, binding=0) uniform UniformBufferObject
+layout(std140, set=0, binding=0) uniform scene_constant_buffer
 {
     mat4 view_projection;
-} ubo;
+} uniform_buffers[100];
 
-layout(set=0, binding=1) buffer instance_buffer 
+layout(std430, set=0, binding=1) buffer instance_buffer 
 {
     instance instances[];
+} instance_buffers[100];
+
+layout(push_constant) uniform render_resources 
+{
+    uint scene_cb;
+    uint inst_b;
 };
 
 void main()
 {
-    vec4 p = vec4(position.x, position.y, position.z, 1.f);
+    vec4 p = vec4(position, 1.f);
     
-    gl_Position = ubo.view_projection * instances[gl_InstanceIndex].model * p;
+    instance inst        = instance_buffers[inst_b].instances[gl_InstanceIndex];
+    mat4 view_projection = uniform_buffers[scene_cb].view_projection;
 
-    out_color = in_color;
+    gl_Position = view_projection * inst.model * p;
+
+    fragment_color = vertex_color;
 }
 

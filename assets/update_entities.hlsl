@@ -13,7 +13,6 @@ struct physics
 struct instance
 {
     matrix model;
-    matrix normal;
 };
 
 struct rt_instance
@@ -25,11 +24,6 @@ struct rt_instance
     uint     sbt_offset : 24;
     uint     flags : 8;
     uint64_t blas;
-};
-
-struct scene_data
-{
-    double delta;
 };
 
 #define IDENTITY float4x4(1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1)
@@ -114,7 +108,7 @@ float4 update_orientation(float4 orientation, float3 rotation)
     return normalize(new_orientation);
 }
 
-[numthreads(32,32,1)]
+[numthreads(8,8,1)]
 void main(uint3 group_id : SV_GroupID, uint3 thread_id : SV_DispatchThreadID, uint3 group_thread_id : SV_GroupThreadID, uint group_index : SV_GroupIndex)
 {
     const int index = thread_id.x;
@@ -144,10 +138,7 @@ void main(uint3 group_id : SV_GroupID, uint3 thread_id : SV_DispatchThreadID, ui
     rt_instances[index].transform[1] = model[1];
     rt_instances[index].transform[2] = model[2];
 
-    //rt_instances[index].blas = rt_blas_buffer[0];
-    //rt_instances[index].sbt_offset = 0;
     rt_instances[index].id = index;
-    //rt_instances[index].mask = 0xFF;
 
     float3 quat_rotate = p.w;
     transforms[index].orientation = update_orientation(t.orientation, quat_rotate);

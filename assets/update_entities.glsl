@@ -10,17 +10,34 @@ struct transform
 struct instance
 {
     mat4 model;
-    mat4 normal;
 };
 
-layout(set=0, binding=0) buffer transform_buffer
+struct physics
+{
+    vec4 w;
+};
+
+layout(set=0, binding=1) buffer transform_buffers
 {
     transform transforms[];
-};
+} transform_buffer[100];
 
-layout(set=0, binding=1) writeonly buffer instance_buffer 
+layout(set=0, binding=1) buffer instance_buffers 
 {
     instance instances[];
+} instance_buffer[100];
+
+layout(set=0, binding=1) buffer physics_buffers 
+{
+    physics phys[];
+} physics_buffer[100];
+
+layout(push_constant) uniform render_resources
+{
+    uint transform_b;
+    uint physics_b;
+    uint instance_b;
+    uint rt, d;
 };
 
 #define IDENTITY mat4x4(1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1)
@@ -94,12 +111,14 @@ vec4 update_orientation(vec4 orientation, vec3 rotation)
     return normalize(new_orientation);
 }
 
-layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+layout(local_size_x=8, local_size_y=8, local_size_z=1) in;
 void main()
 {
     uint index = gl_GlobalInvocationID.x;
 
-    transform t = transforms[index];
+    transform t = transform_buffer[transform_b].transforms[index];
+    instance  i = instance_buffer[instance_b].instances[index];
+    physics   p = physics_buffer[physics_b].phys[index];
 
     mat4 model = IDENTITY;
 
@@ -107,10 +126,9 @@ void main()
     mat4 rotation    = matrix_rotate(t.orientation);
     mat4 scaling     = matrix_scale(t.scale);
 
-    model = scaling * rotation * translation; 
+    model = scaling * rotation * translation * model;
 
-    vec3 quat_rotate = vec3(0,0.001f,0);
-    transforms[index].orientation = update_orientation(t.orientation, quat_rotate);
-    instances[index].model        = transpose(model);
+    transform_buffer[transform_b].transforms[index].orientation = update_orientation(t.orientation, p.w.xyz);
+    instance_buffer[instance_b].instances[index].model          = transpose(model);
 }
 

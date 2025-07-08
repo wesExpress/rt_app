@@ -22,15 +22,9 @@ typedef struct application_data_t
     char       fps_text[512];
     char       frame_time_text[512];
 
-    //transform transforms[MAX_ENTITIES];
-    //physics   phys[MAX_ENTITIES];
-    //dm_raytracing_instance raytracing_instances[MAX_ENTITIES];
-
     entity_data entities;
 
     simple_camera camera;
-
-    dm_mat4 gui_proj;
 
     dm_timer frame_timer, fps_timer;
     uint16_t frame_count;

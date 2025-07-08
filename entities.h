@@ -3,7 +3,7 @@
 
 #include "dm.h"
 
-#define MAX_ENTITIES 1000
+#define MAX_ENTITIES 100000
 
 typedef struct transform_t
 {
@@ -15,7 +15,6 @@ typedef struct transform_t
 typedef struct instance_t 
 {
     dm_mat4 model;
-    dm_mat4 normal;
 } instance;
 
 typedef struct material_t
@@ -26,7 +25,7 @@ typedef struct material_t
 
 typedef struct physics_t
 {
-    dm_vec3 w;
+    dm_vec4 w;
 } physics;
 
 typedef struct compute_resources_t 
@@ -53,6 +52,7 @@ typedef struct entity_data
 } entity_data;
 
 bool init_entities(dm_context* context);
+bool init_entity_pipeline(dm_context* context);
 void update_entities(dm_context* context);
 
 #endif

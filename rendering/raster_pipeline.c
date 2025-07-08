@@ -111,7 +111,11 @@ bool raster_pipeline_update(dm_context* context)
 
     app_data->raster_data.c_data.delta_t = 0.001f;
     
+#ifdef DM_DIRECTX12
     dm_mat4_transpose(app_data->camera.vp, app_data->raster_data.scene_data.view_proj);
+#else
+    dm_memcpy(app_data->raster_data.scene_data.view_proj, app_data->camera.vp, sizeof(dm_mat4));
+#endif
 
     return true;
 }

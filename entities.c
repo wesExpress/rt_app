@@ -1,8 +1,6 @@
 #include "entities.h"
 #include "app.h"
 
-#include "rendering/debug_pipeline.h"
-
 #ifndef DM_DEBUG
 DM_INLINE
 #endif
@@ -58,6 +56,13 @@ bool init_entities(dm_context* context)
         app_data->entities.materials[i].ib_index = app_data->raster_data.ib_cube.descriptor_index;
     }
 
+    return true;
+}
+
+bool init_entity_pipeline(dm_context* context)
+{
+    application_data* app_data = context->app_data;
+
     // === transform storage buffer ===
     {
         dm_storage_buffer_desc b_desc = { 0 };
@@ -108,7 +113,7 @@ bool init_entities(dm_context* context)
 #ifdef DM_DIRECTX12
         dm_strcpy(desc.shader.path, "assets/update_entities.cso");
 #elif defined(DM_VULKAN)
-        dm_strcpy(desc.shader.path, "assets/compute_shader.spv");
+        dm_strcpy(desc.shader.path, "assets/update_entities.spv");
 #endif
 
         if(!dm_compute_create_compute_pipeline(desc, &app_data->entities.compute_pipeline, context)) return false;
@@ -130,6 +135,6 @@ void update_entities(dm_context* context)
 
     dm_compute_command_bind_compute_pipeline(app_data->entities.compute_pipeline, context);
     dm_compute_command_set_root_constants(0,5,0, &app_data->entities.resources, context);
-    dm_compute_command_dispatch(1024,1,1, context);
+    dm_compute_command_dispatch(MAX_ENTITIES / 8,1,1, context);
 }
 

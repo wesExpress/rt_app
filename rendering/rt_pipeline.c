@@ -3,6 +3,8 @@
 #include "../data.h"
 #include "../entities.h"
 
+#include <stdio.h>
+
 #define CUBE_BLAS 0
 #define TRI_BLAS  1
 #define QUAD_BLAS 2
@@ -11,8 +13,6 @@ typedef struct ray_payload_t
 {
     dm_vec4 color;
 } ray_payload;
-
-
 
 bool rt_pipeline_init(dm_context* context)
 {
@@ -42,7 +42,11 @@ bool rt_pipeline_init(dm_context* context)
         };
 
         dm_raytracing_pipeline_desc rt_pipe_desc = {  
+#ifdef DM_DIRECTX12
             .shader_path = "assets/rt_shader.cso",
+#elif defined(DM_VULKAN)
+            .shader_path = "assets/rt_shader.spv",
+#endif
             .raygen = "ray_generation", .miss = "miss",
             .hit_groups[0]=hit_group, .hit_group_count=1,
             .payload_size=sizeof(ray_payload), .max_depth=1, .max_instance_count=MAX_ENTITIES
@@ -90,14 +94,14 @@ bool rt_pipeline_init(dm_context* context)
         if(!dm_renderer_create_storage_buffer(desc, &app_data->rt_data.blas_buffer, context)) return false;
     }
 
-    // fill in and create rt instance buffer
+    // === fill in and create rt instance buffer ===
     {
         for(uint32_t i=0; i<MAX_ENTITIES; i++)
         {
             app_data->entities.rt_instances[i].id = i;
             app_data->entities.rt_instances[i].sbt_offset = 0;
             app_data->entities.rt_instances[i].mask = 0xFF;
-            app_data->entities.rt_instances[i].blas_address = app_data->rt_data.blas_addresses[CUBE_BLAS];
+            app_data->entities.rt_instances[i].blas_address = app_data->rt_data.blas_addresses[0];
         }
         
         dm_storage_buffer_desc desc = { 0 };
@@ -127,11 +131,13 @@ bool rt_pipeline_init(dm_context* context)
         if(!dm_renderer_create_constant_buffer(desc, &app_data->rt_data.cb, context)) return false;
 
         desc.size = sizeof(rt_camera_data);
-        desc.data = NULL;
+        desc.data = &app_data->rt_data.camera_data;
 
         if(!dm_renderer_create_constant_buffer(desc, &app_data->rt_data.compute_cb, context)) return false;
 
         desc.size = sizeof(rt_image_data);
+        desc.data = &app_data->rt_data.image_data;
+        
 
         if(!dm_renderer_create_constant_buffer(desc, &app_data->rt_data.compute_image_cb, context)) return false;
     }
@@ -139,7 +145,11 @@ bool rt_pipeline_init(dm_context* context)
     // === compute pipeline ===
     {
         dm_compute_pipeline_desc desc = {  
+#ifdef DM_DIRECTX12
             .shader="assets/ray_directions.cso"
+#elif defined(DM_VULKAN)
+            .shader="assets/ray_directions.spv",
+#endif
         };
 
         if(!dm_compute_create_compute_pipeline(desc, &app_data->rt_data.compute_pipeline, context)) return false;
@@ -157,9 +167,8 @@ bool rt_pipeline_update(dm_context* context)
     dm_mat4_transpose(app_data->camera.inv_view, app_data->rt_data.camera_data.inv_view);
     dm_mat4_transpose(app_data->camera.inv_proj, app_data->rt_data.camera_data.inv_proj);
 #elif defined(DM_VULKAN)
-    dm_memcpy(app_data->rt_data.scene_data.inv_view, app_data->camera.inv_view, sizeof(dm_mat4));
-    dm_memcpy(app_data->rt_data.scene_data.inv_proj, app_data->camera.inv_proj, sizeof(dm_mat4));
-    dm_memcpy(app_data->rt_data.scene_data.inv_vp,   app_data->camera.inv_view_proj, sizeof(dm_mat4));
+    dm_memcpy(app_data->rt_data.camera_data.inv_view, app_data->camera.inv_view, sizeof(dm_mat4));
+    dm_memcpy(app_data->rt_data.camera_data.inv_proj, app_data->camera.inv_proj, sizeof(dm_mat4));
 #endif
 
     dm_memcpy(app_data->rt_data.scene_data.origin, app_data->camera.pos, sizeof(dm_vec3));
@@ -168,9 +177,9 @@ bool rt_pipeline_update(dm_context* context)
     app_data->rt_data.image_data.width  = context->renderer.width;
     app_data->rt_data.image_data.height = context->renderer.height;
 
-    app_data->rt_data.scene_data.sky_color[0] = 0.2f;
-    app_data->rt_data.scene_data.sky_color[1] = 0.5f;
-    app_data->rt_data.scene_data.sky_color[2] = 0.7f;
+    app_data->rt_data.scene_data.sky_color[0] = 0.f;
+    app_data->rt_data.scene_data.sky_color[1] = 0.f;
+    app_data->rt_data.scene_data.sky_color[2] = 0.f;
 
     return true;
 }
@@ -179,6 +188,7 @@ bool rt_pipeline_render(dm_context* context)
 {
     application_data* app_data = context->app_data;
 
+#if 1
     // compute stuff
     app_data->rt_data.compute_resources.camera_buffer = app_data->rt_data.compute_cb.descriptor_index;
     app_data->rt_data.compute_resources.image_data    = app_data->rt_data.compute_image_cb.descriptor_index;
@@ -190,6 +200,7 @@ bool rt_pipeline_render(dm_context* context)
     dm_compute_command_bind_compute_pipeline(app_data->rt_data.compute_pipeline, context);
     dm_compute_command_set_root_constants(0,3,0, &app_data->rt_data.compute_resources, context);
     dm_compute_command_dispatch(context->renderer.width, context->renderer.height, 1, context);
+#endif
 
     // resource indices
     app_data->rt_data.resources.acceleration_structure = app_data->rt_data.tlas.descriptor_index;
