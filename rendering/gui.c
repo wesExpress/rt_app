@@ -1,9 +1,11 @@
 #include "gui.h"
+#include "../app.h"
 
 typedef struct gui_resources_t
 {
     uint32_t scene_data;
     uint32_t texture;
+    uint32_t sampler;
 } gui_resources;
 
 typedef struct gui_quad_vertex_t
@@ -25,14 +27,14 @@ typedef struct gui_text_vertex_t
 typedef struct gui_context_t
 {
     dm_resource_handle quad_vb, quad_ib;
-    gui_quad_vertex  quad_vertices[MAX_GUI_VERTICES];
-    uint32_t         quad_vertex_count;
+    gui_quad_vertex    quad_vertices[MAX_GUI_VERTICES];
+    uint32_t           quad_vertex_count;
 
     dm_resource_handle font_vb[MAX_FONT_COUNT];
-    dm_font          fonts[MAX_FONT_COUNT];
-    gui_text_vertex  text_vertices[MAX_FONT_COUNT][MAX_GUI_VERTICES];
-    uint32_t         text_vertex_count[MAX_FONT_COUNT];
-    uint8_t          font_count;
+    dm_font            fonts[MAX_FONT_COUNT];
+    gui_text_vertex    text_vertices[MAX_FONT_COUNT][MAX_GUI_VERTICES];
+    uint32_t           text_vertex_count[MAX_FONT_COUNT];
+    uint8_t            font_count;
 
     gui_style style;
 
@@ -42,6 +44,8 @@ typedef struct gui_context_t
     gui_resources text_resources[MAX_FONT_COUNT];
 
     gui_proj cb_data;
+
+    uint32_t screen_width, screen_height;
 } gui_context;
 
 bool gui_init(gui_style style, uint8_t font_count, void** gui_ctxt, dm_context* context)
@@ -84,7 +88,7 @@ bool gui_init(gui_style style, uint8_t font_count, void** gui_ctxt, dm_context* 
 
         dm_constant_buffer_desc cb_desc = { 0 };
         cb_desc.size = sizeof(gui_proj);
-        cb_desc.data = c->cb_data.ortho_proj;
+        cb_desc.data = &c->cb_data;
 
         if(!dm_renderer_create_constant_buffer(cb_desc, &c->cb, context)) return false;
     }
@@ -184,14 +188,18 @@ bool gui_init(gui_style style, uint8_t font_count, void** gui_ctxt, dm_context* 
         if(!dm_renderer_create_raster_pipeline(desc, &c->text_pipe, context)) return false;
     }
 
+    c->screen_width = context->renderer.width;
+    c->screen_height = context->renderer.height;
+
     return true;
 }
 
 bool gui_load_font(const char* path, uint8_t font_size, uint8_t* font_index, void* gui_ctxt, dm_context* context)
 {
     gui_context* c = gui_ctxt;
+    application_data* app_data = context->app_data;
 
-    if(!dm_renderer_load_font(path, font_size, &c->fonts[c->font_count], context)) return false;
+    if(!dm_renderer_load_font(path, font_size, app_data->default_sampler, &c->fonts[c->font_count], context)) return false;
 
     *font_index = c->font_count++; 
 
@@ -372,7 +380,21 @@ void gui_update_buffers(void* gui_ctxt, dm_context* context)
 
 void gui_render(void* gui_ctxt, dm_context* context)
 {
+    application_data* app_data = context->app_data;
+
     gui_context* c = gui_ctxt;
+
+    if(context->renderer.width != c->screen_width || context->renderer.height != c->screen_height)
+    {
+        c->screen_width  = context->renderer.width;
+        c->screen_height = context->renderer.height;
+
+        dm_mat_ortho(0,(float)context->renderer.width, (float)context->renderer.height,0, -1,1, c->cb_data.ortho_proj);
+#ifdef DM_DIRECTX12
+        dm_mat4_transpose(c->cb_data.ortho_proj, c->cb_data.ortho_proj);
+#endif
+    }
+    dm_render_command_update_constant_buffer(&c->cb_data, sizeof(c->cb_data), c->cb, context);
 
     c->quad_resources.scene_data = c->cb.descriptor_index;
 
@@ -397,6 +419,7 @@ void gui_render(void* gui_ctxt, dm_context* context)
 
         c->text_resources[i].scene_data = c->cb.descriptor_index;
         c->text_resources[i].texture    = c->fonts[i].texture_handle.descriptor_index;
+        c->text_resources[i].sampler    = app_data->default_sampler.descriptor_index;
 
         dm_render_command_set_root_constants(0,2,0, &c->text_resources[i], context);
         dm_render_command_bind_vertex_buffer(c->font_vb[i], 0, context);

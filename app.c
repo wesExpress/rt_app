@@ -23,6 +23,8 @@ bool dm_application_init(dm_context* context)
     dm_timer_start(&app_data->frame_timer, context);
     dm_timer_start(&app_data->fps_timer, context);
 
+    if(!dm_renderer_create_sampler(&app_data->default_sampler, context)) return false;
+
     // gui
     {
         gui_style style = { 0 };
@@ -48,9 +50,10 @@ bool dm_application_init(dm_context* context)
 
     if(!raster_pipeline_init(context)) return false;
     if(!init_entities(context)) return false;
-    //if(!rt_pipeline_init(context)) return false;
+    if(!rt_pipeline_init(context)) return false;
     if(!init_entity_pipeline(context)) return false;
     if(!debug_pipeline_init(context)) return false;
+    if(!quad_texture_init(context)) return false;
 
     return true;
 }
@@ -75,7 +78,7 @@ bool dm_application_update(dm_context* context)
 
     // various updates
     if(!raster_pipeline_update(context)) return false;
-    //if(!rt_pipeline_update(context))     return false;
+    if(!rt_pipeline_update(context))     return false;
     if(!debug_pipeline_update(context))  return false;
     
     // gui
@@ -123,12 +126,17 @@ bool dm_application_render(dm_context* context)
 
     gui_update_buffers(app_data->gui_context, context);
 
+    // tlas before anything happens
+    if(app_data->ray_trace) rt_pipeline_update_tlas(context);
+
     // render after
-    dm_render_command_begin_render_pass(0.2f,0.5f,0.7f,1.f, context);
+    //dm_render_command_begin_render_pass(0.2f,0.5f,0.7f,1.f, context);
+    dm_render_command_begin_render_pass(0,0,0,1.f, context);
 
     if(app_data->ray_trace)
     {
-        //if(!rt_pipeline_render(context)) return false;
+        if(!rt_pipeline_render(context)) return false;
+        if(!quad_texture_render(app_data->rt_data.image, context)) return false;
     }
     else 
     {

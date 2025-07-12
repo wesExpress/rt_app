@@ -25,12 +25,11 @@ bool rt_pipeline_init(dm_context* context)
         desc.width      = context->renderer.width;
         desc.height     = context->renderer.height;
         desc.n_channels = 4;
-        desc.write      = true;
 
-        if(!dm_renderer_create_texture(desc, &app_data->rt_data.image, context)) return false;
+        if(!dm_renderer_create_storage_texture(desc, &app_data->rt_data.image, context)) return false;
 
         desc.format = DM_TEXTURE_FORMAT_FLOAT_4;
-        if(!dm_renderer_create_texture(desc, &app_data->rt_data.ray_image, context)) return false;
+        if(!dm_renderer_create_storage_texture(desc, &app_data->rt_data.ray_image, context)) return false;
     }
 
     // === rt pipeline === 
@@ -101,7 +100,7 @@ bool rt_pipeline_init(dm_context* context)
             app_data->entities.rt_instances[i].id = i;
             app_data->entities.rt_instances[i].sbt_offset = 0;
             app_data->entities.rt_instances[i].mask = 0xFF;
-            app_data->entities.rt_instances[i].blas_address = app_data->rt_data.blas_addresses[0];
+            app_data->entities.rt_instances[i].blas_address = app_data->rt_data.blas_addresses[CUBE_BLAS];
         }
         
         dm_storage_buffer_desc desc = { 0 };
@@ -135,9 +134,11 @@ bool rt_pipeline_init(dm_context* context)
 
         if(!dm_renderer_create_constant_buffer(desc, &app_data->rt_data.compute_cb, context)) return false;
 
+        app_data->rt_data.image_data.width  = context->renderer.width;
+        app_data->rt_data.image_data.height = context->renderer.height;
+
         desc.size = sizeof(rt_image_data);
         desc.data = &app_data->rt_data.image_data;
-        
 
         if(!dm_renderer_create_constant_buffer(desc, &app_data->rt_data.compute_image_cb, context)) return false;
     }
@@ -174,12 +175,22 @@ bool rt_pipeline_update(dm_context* context)
     dm_memcpy(app_data->rt_data.scene_data.origin, app_data->camera.pos, sizeof(dm_vec3));
     dm_memcpy(app_data->rt_data.camera_data.position, app_data->camera.pos, sizeof(dm_vec4));
 
-    app_data->rt_data.image_data.width  = context->renderer.width;
-    app_data->rt_data.image_data.height = context->renderer.height;
+    if(context->renderer.width != app_data->rt_data.image_data.width || context->renderer.height != app_data->rt_data.image_data.height)
+    {
+        app_data->rt_data.image_data.width  = context->renderer.width;
+        app_data->rt_data.image_data.height = context->renderer.height;
+
+        app_data->rt_data.resized = true;
+    }
 
     app_data->rt_data.scene_data.sky_color[0] = 0.f;
     app_data->rt_data.scene_data.sky_color[1] = 0.f;
     app_data->rt_data.scene_data.sky_color[2] = 0.f;
+
+    // blas addresses
+    if(!dm_renderer_get_blas_gpu_address(app_data->rt_data.cube_blas,     &app_data->rt_data.blas_addresses[CUBE_BLAS], context)) return false;
+    if(!dm_renderer_get_blas_gpu_address(app_data->rt_data.triangle_blas, &app_data->rt_data.blas_addresses[TRI_BLAS],  context)) return false;
+    if(!dm_renderer_get_blas_gpu_address(app_data->rt_data.quad_blas,     &app_data->rt_data.blas_addresses[QUAD_BLAS], context)) return false;
 
     return true;
 }
@@ -199,7 +210,7 @@ bool rt_pipeline_render(dm_context* context)
 
     dm_compute_command_bind_compute_pipeline(app_data->rt_data.compute_pipeline, context);
     dm_compute_command_set_root_constants(0,3,0, &app_data->rt_data.compute_resources, context);
-    dm_compute_command_dispatch(context->renderer.width, context->renderer.height, 1, context);
+    dm_compute_command_dispatch(context->renderer.width / 8, context->renderer.height / 8, 1, context);
 #endif
 
     // resource indices
@@ -211,13 +222,25 @@ bool rt_pipeline_render(dm_context* context)
 
     // update render objects
     dm_render_command_update_constant_buffer(&app_data->rt_data.scene_data, sizeof(scene_cb), app_data->rt_data.cb, context);
-    dm_render_command_update_tlas(MAX_ENTITIES, app_data->rt_data.tlas, context);
+    if(app_data->rt_data.resized) 
+    {
+        dm_render_command_resize_texture(context->renderer.width, context->renderer.height, app_data->rt_data.image, context);
+        app_data->rt_data.resized = false;
+    }
 
     // render
     dm_render_command_bind_raytracing_pipeline(app_data->rt_data.pipeline, context);
     dm_render_command_set_root_constants(0,5,0, &app_data->rt_data.resources, context);
     dm_render_command_dispatch_rays(context->renderer.width, context->renderer.height, app_data->rt_data.pipeline, context);
-    dm_render_command_copy_image_to_screen(app_data->rt_data.image, context);
+    //dm_render_command_copy_image_to_screen(app_data->rt_data.image, context);
 
     return true;
+}
+
+void rt_pipeline_update_tlas(dm_context* context)
+{
+    application_data* app_data = context->app_data;
+
+    dm_render_command_update_tlas(MAX_ENTITIES, app_data->rt_data.tlas, context);
+    dm_render_command_update_storage_buffer(app_data->rt_data.blas_addresses, sizeof(app_data->rt_data.blas_addresses), app_data->rt_data.blas_buffer, context);
 }

@@ -16,6 +16,7 @@ SET(SOURCES
     rendering/raster_pipeline.c
     rendering/rt_pipeline.c
     rendering/debug_pipeline.c
+    rendering/quad_texture.c
 )
 
 ADD_EXECUTABLE(${PROJECT_NAME} ${SOURCES})

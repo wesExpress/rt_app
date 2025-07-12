@@ -20,7 +20,7 @@ struct resource_data
 
 ConstantBuffer<resource_data> resources : register(b0);
 
-[numthreads(16,16,1)]
+[numthreads(8,8,1)]
 void main(uint3 group_id : SV_GroupID, uint3 thread_id : SV_DispatchThreadID, uint3 group_thread_id : SV_GroupThreadID, uint group_index : SV_GroupIndex)
 {
     ConstantBuffer<camera_data> camera_buffer = ResourceDescriptorHeap[resources.camera_data];

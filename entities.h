@@ -3,7 +3,7 @@
 
 #include "dm.h"
 
-#define MAX_ENTITIES 100000
+#define MAX_ENTITIES (8 << 8)
 
 typedef struct transform_t
 {

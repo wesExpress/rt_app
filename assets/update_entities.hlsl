@@ -108,7 +108,7 @@ float4 update_orientation(float4 orientation, float3 rotation)
     return normalize(new_orientation);
 }
 
-[numthreads(8,8,1)]
+[numthreads(8,1,1)]
 void main(uint3 group_id : SV_GroupID, uint3 thread_id : SV_DispatchThreadID, uint3 group_thread_id : SV_GroupThreadID, uint group_index : SV_GroupIndex)
 {
     const int index = thread_id.x;
@@ -140,6 +140,12 @@ void main(uint3 group_id : SV_GroupID, uint3 thread_id : SV_DispatchThreadID, ui
 
     rt_instances[index].id = index;
 
-    float3 quat_rotate = p.w;
-    transforms[index].orientation = update_orientation(t.orientation, quat_rotate);
+    uint count = 2;
+    const float half_dt = 0.0016 * 0.5f;
+    float3 quat_rotate = p.w * half_dt;
+    while(count > 0)
+    {
+        transforms[index].orientation = update_orientation(t.orientation, quat_rotate);
+        count--;
+    }
 }

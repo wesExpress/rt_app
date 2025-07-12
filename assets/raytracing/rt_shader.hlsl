@@ -19,7 +19,6 @@ struct vertex
 struct instance
 {
     matrix model;
-    matrix normal;
 };
 
 struct material

@@ -56,10 +56,13 @@ typedef struct rt_pipeline_data_t
 
     rt_resources resources;
     rt_compute_resources compute_resources;
+        
+    bool resized;
 } rt_pipeline_data;
 
 bool rt_pipeline_init(dm_context* context);
 bool rt_pipeline_update(dm_context* context);
 bool rt_pipeline_render(dm_context* context);
+void rt_pipeline_update_tlas(dm_context* context);
 
 #endif

@@ -36,10 +36,6 @@ physics init_physics(dm_context* context)
     p.w[1] = dm_random_float(context) * 2.f - 1.f;
     p.w[2] = dm_random_float(context) * 2.f - 1.f;
 
-    p.w[0] *= 0.005f;
-    p.w[1] *= 0.005f;
-    p.w[2] *= 0.005f;
-
     return p;
 }
 
@@ -49,7 +45,7 @@ bool init_entities(dm_context* context)
 
     for(uint32_t i=0; i<MAX_ENTITIES; i++)
     {
-        app_data->entities.transforms[i] = init_transform(50.f, context);
+        app_data->entities.transforms[i] = init_transform((float)MAX_ENTITIES * 0.25f, context);
         app_data->entities.phys[i]       = init_physics(context);
 
         app_data->entities.materials[i].vb_index = app_data->raster_data.vb_cube.descriptor_index;

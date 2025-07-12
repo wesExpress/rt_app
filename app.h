@@ -7,6 +7,7 @@
 #include "rendering/raster_pipeline.h"
 #include "rendering/rt_pipeline.h"
 #include "rendering/debug_pipeline.h"
+#include "rendering/quad_texture.h"
 
 #include "camera.h"
 
@@ -15,6 +16,9 @@ typedef struct application_data_t
     raster_pipeline_data raster_data;
     rt_pipeline_data     rt_data;
     debug_pipeline_data  debug_data;
+    quad_texture_data    quad_texture_data;
+
+    dm_resource_handle default_sampler;
 
     void* gui_context;
     uint8_t font16, font32;

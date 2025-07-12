@@ -1,4 +1,5 @@
 #version 450
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 
 struct transform
 {
@@ -10,6 +11,16 @@ struct transform
 struct instance
 {
     mat4 model;
+};
+
+struct rt_instance
+{
+    vec4    transform[3];
+
+    uint id_mask;
+    uint offset_flags;
+
+    uint64_t blas;
 };
 
 struct physics
@@ -32,12 +43,23 @@ layout(set=0, binding=1) buffer physics_buffers
     physics phys[];
 } physics_buffer[100];
 
+layout(set=0, binding=1) buffer rt_instance_buffers
+{
+    rt_instance instances[];
+} rt_instance_buffer[100];
+
+layout(set=0, binding=1) buffer rt_blas_buffers
+{
+    uint64_t address[];
+} rt_blas_buffer[100];
+
 layout(push_constant) uniform render_resources
 {
     uint transform_b;
     uint physics_b;
     uint instance_b;
-    uint rt, d;
+    uint rt_b;
+    uint blas_b;
 };
 
 #define IDENTITY mat4x4(1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1)
@@ -111,7 +133,7 @@ vec4 update_orientation(vec4 orientation, vec3 rotation)
     return normalize(new_orientation);
 }
 
-layout(local_size_x=8, local_size_y=8, local_size_z=1) in;
+layout(local_size_x=8, local_size_y=1, local_size_z=1) in;
 void main()
 {
     uint index = gl_GlobalInvocationID.x;
@@ -128,7 +150,28 @@ void main()
 
     model = scaling * rotation * translation * model;
 
-    transform_buffer[transform_b].transforms[index].orientation = update_orientation(t.orientation, p.w.xyz);
-    instance_buffer[instance_b].instances[index].model          = transpose(model);
+    model = transpose(model);
+
+    rt_instance_buffer[rt_b].instances[index].transform[0] = model[0];
+    rt_instance_buffer[rt_b].instances[index].transform[1] = model[1];
+    rt_instance_buffer[rt_b].instances[index].transform[2] = model[2];
+
+    rt_instance_buffer[rt_b].instances[index].id_mask = index;
+    rt_instance_buffer[rt_b].instances[index].id_mask |= 0xFF << 24;
+
+    rt_instance_buffer[rt_b].instances[index].blas = rt_blas_buffer[blas_b].address[0];
+
+    uint count = 2;
+    const float half_dt = 0.0016f * 0.5f;
+    vec3 delta_rot = p.w.xyz * half_dt;
+    
+    while(count > 0)
+    {
+        t.orientation = update_orientation(t.orientation, delta_rot);
+        count--;
+    }
+
+    transform_buffer[transform_b].transforms[index].orientation = t.orientation;
+    instance_buffer[instance_b].instances[index].model          = model;
 }
 

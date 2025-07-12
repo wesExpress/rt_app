@@ -16,7 +16,6 @@ struct VERTEX_OUT
 struct instance
 {
     float4x4 model;
-    float4x4 normal;
 };
 
 struct scene_data
@@ -39,9 +38,11 @@ VERTEX_OUT main(VERTEX_IN v_in, uint inst_id : SV_InstanceID)
     ConstantBuffer<scene_data> scene_buffer    = ResourceDescriptorHeap[resources.scene_cb];
     StructuredBuffer<instance> instance_buffer = ResourceDescriptorHeap[resources.inst_b];
 
+    instance inst = instance_buffer[inst_id];
+
     v_out.pos = float4(v_in.pos);
     v_out.pos.w = 1.f;
-    v_out.pos = mul(v_out.pos, instance_buffer[inst_id].model);
+    v_out.pos = mul(v_out.pos, inst.model);
     
     v_out.world_pos = v_out.pos;
 
