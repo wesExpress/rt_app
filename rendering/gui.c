@@ -421,7 +421,7 @@ void gui_render(void* gui_ctxt, dm_context* context)
         c->text_resources[i].texture    = c->fonts[i].texture_handle.descriptor_index;
         c->text_resources[i].sampler    = app_data->default_sampler.descriptor_index;
 
-        dm_render_command_set_root_constants(0,2,0, &c->text_resources[i], context);
+        dm_render_command_set_root_constants(0,3,0, &c->text_resources[i], context);
         dm_render_command_bind_vertex_buffer(c->font_vb[i], 0, context);
         dm_render_command_draw_instanced(1,0, c->text_vertex_count[i],0, context);
 

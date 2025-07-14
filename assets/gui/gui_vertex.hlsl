@@ -8,8 +8,8 @@ struct VS_INPUT
 struct VS_OUTPUT
 {
     float4 pos   : SV_Position;
-    float2 uv    : TEX_COORDS1;
     float4 color : COLOR1;
+    float2 uv    : TEX_COORDS1;
 };
 
 struct scene_data
