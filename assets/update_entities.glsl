@@ -1,6 +1,8 @@
 #version 450
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 
+#include "shader_include.h"
+
 struct transform
 {
     vec4 position;
@@ -28,31 +30,6 @@ struct physics
     vec4 w;
 };
 
-layout(set=0, binding=1) buffer transform_buffers
-{
-    transform transforms[];
-} transform_buffer[100];
-
-layout(set=0, binding=1) buffer instance_buffers 
-{
-    instance instances[];
-} instance_buffer[100];
-
-layout(set=0, binding=1) buffer physics_buffers 
-{
-    physics phys[];
-} physics_buffer[100];
-
-layout(set=0, binding=1) buffer rt_instance_buffers
-{
-    rt_instance instances[];
-} rt_instance_buffer[100];
-
-layout(set=0, binding=1) buffer rt_blas_buffers
-{
-    uint64_t address[];
-} rt_blas_buffer[100];
-
 layout(push_constant) uniform render_resources
 {
     uint transform_b;
@@ -61,6 +38,12 @@ layout(push_constant) uniform render_resources
     uint rt_b;
     uint blas_b;
 };
+
+layout(set=0, binding=0) buffer b0 { transform data[]; }   transform_buffer[RESOURCE_HEAP_SIZE];
+layout(set=0, binding=0) buffer b1 { instance data[]; }    instance_buffer[RESOURCE_HEAP_SIZE];
+layout(set=0, binding=0) buffer b2 { physics data[]; }     physics_buffer[RESOURCE_HEAP_SIZE];
+layout(set=0, binding=0) buffer b3 { rt_instance data[]; } rt_instance_buffer[RESOURCE_HEAP_SIZE];
+layout(set=0, binding=0) buffer b4 { uint64_t data[]; }    rt_blas_buffer[RESOURCE_HEAP_SIZE];
 
 #define IDENTITY mat4x4(1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1)
 
@@ -138,9 +121,9 @@ void main()
 {
     uint index = gl_GlobalInvocationID.x;
 
-    transform t = transform_buffer[transform_b].transforms[index];
-    instance  i = instance_buffer[instance_b].instances[index];
-    physics   p = physics_buffer[physics_b].phys[index];
+    transform t = transform_buffer[transform_b].data[index];
+    instance  i = instance_buffer[instance_b].data[index];
+    physics   p = physics_buffer[physics_b].data[index];
 
     mat4 model = IDENTITY;
 
@@ -150,16 +133,15 @@ void main()
 
     model = scaling * rotation * translation * model;
 
-    model = transpose(model);
 
-    rt_instance_buffer[rt_b].instances[index].transform[0] = model[0];
-    rt_instance_buffer[rt_b].instances[index].transform[1] = model[1];
-    rt_instance_buffer[rt_b].instances[index].transform[2] = model[2];
+    rt_instance_buffer[rt_b].data[index].transform[0] = model[0];
+    rt_instance_buffer[rt_b].data[index].transform[1] = model[1];
+    rt_instance_buffer[rt_b].data[index].transform[2] = model[2];
 
-    rt_instance_buffer[rt_b].instances[index].id_mask = index;
-    rt_instance_buffer[rt_b].instances[index].id_mask |= 0xFF << 24;
+    rt_instance_buffer[rt_b].data[index].id_mask = index;
+    rt_instance_buffer[rt_b].data[index].id_mask |= 0xFF << 24;
 
-    rt_instance_buffer[rt_b].instances[index].blas = rt_blas_buffer[blas_b].address[0];
+    rt_instance_buffer[rt_b].data[index].blas = rt_blas_buffer[blas_b].data[0];
 
     uint count = 2;
     const float half_dt = 0.0016f * 0.5f;
@@ -171,7 +153,8 @@ void main()
         count--;
     }
 
-    transform_buffer[transform_b].transforms[index].orientation = t.orientation;
-    instance_buffer[instance_b].instances[index].model          = model;
+    model = transpose(model);
+    transform_buffer[transform_b].data[index].orientation = t.orientation;
+    instance_buffer[instance_b].data[index].model         = model;
 }
 

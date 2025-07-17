@@ -20,7 +20,7 @@ bool quad_texture_init(dm_context* context)
 
     uint32_t indices[] = {
         0,1,2,
-        2,3,1
+        2,3,0
     };
 
     // === vertex buffer ===
@@ -107,19 +107,17 @@ bool quad_texture_init(dm_context* context)
     return true;
 }
 
-bool quad_texture_render(dm_resource_handle texture, dm_context* context)
+void quad_texture_render(dm_resource_handle texture, dm_context* context)
 {
     application_data* app_data = context->app_data;
 
-    app_data->quad_texture_data.resources.image_index   = texture.descriptor_index; 
+    app_data->quad_texture_data.resources.image_index   = texture.descriptor_index + 1; 
     app_data->quad_texture_data.resources.sampler_index = app_data->default_sampler.descriptor_index;
 
     dm_render_command_bind_raster_pipeline(app_data->quad_texture_data.pipeline, context);
-    dm_render_command_set_root_constants(0,1,0, &app_data->quad_texture_data.resources, context);
+    dm_render_command_set_root_constants(0,2,0, &app_data->quad_texture_data.resources, context);
     dm_render_command_bind_vertex_buffer(app_data->quad_texture_data.vb, 0, context);
     dm_render_command_bind_index_buffer(app_data->quad_texture_data.ib, context);
 
     dm_render_command_draw_instanced_indexed(1,0,6,0,0,context);
-    
-    return true;
 } 

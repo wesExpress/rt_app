@@ -18,7 +18,7 @@ typedef struct quad_texture_data_t
 } quad_texture_data;
 
 bool quad_texture_init(dm_context* context);
-bool quad_texture_render(dm_resource_handle texture, dm_context* context);
+void quad_texture_render(dm_resource_handle texture, dm_context* context);
 
 #endif
 

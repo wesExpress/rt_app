@@ -126,19 +126,22 @@ bool dm_application_render(dm_context* context)
 
     gui_update_buffers(app_data->gui_context, context);
 
-    // tlas before anything happens
-    if(app_data->ray_trace) rt_pipeline_update_tlas(context);
+    // raytracing has to happen outside of a render pass
+    if(app_data->ray_trace)
+    {
+        rt_pipeline_update_tlas(context);
+        if(!rt_pipeline_render(context)) return false;
+    }
 
     // render after
-    //dm_render_command_begin_render_pass(0.2f,0.5f,0.7f,1.f, context);
     dm_render_command_begin_render_pass(0,0,0,1.f, context);
 
     if(app_data->ray_trace)
     {
-        if(!rt_pipeline_render(context)) return false;
-        if(!quad_texture_render(app_data->rt_data.image, context)) return false;
+        //dm_render_command_copy_image_to_screen(app_data->rt_data.image, context);
+        quad_texture_render(app_data->rt_data.image, context);
     }
-    else 
+    else
     {
         if(!raster_pipeline_render(context)) return false;
     }

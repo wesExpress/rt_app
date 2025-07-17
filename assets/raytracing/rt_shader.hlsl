@@ -3,9 +3,14 @@ struct ray_payload
     float4 color;
 };
 
+struct camera_data
+{
+    matrix inv_view, inv_proj;
+    float4 origin;
+};
+
 struct scene_data
 {
-	float4 origin;
     float4 sky_color;
 };
 
@@ -31,30 +36,48 @@ struct render_resources
 {
     uint acceleration_structure;
     uint image;
+    uint camera_data;
     uint scene_data;
     uint material_buffer;
-    uint ray_image;
 };
 
 ConstantBuffer<render_resources> resources : register(b0);
+
+inline float3 get_direction(uint2 index, uint2 screen_dimensions, float3 origin, matrix inv_view, matrix inv_proj)
+{
+    const float  aspect_ratio = float(screen_dimensions.x) / float(screen_dimensions.y);
+
+    // get screen position
+    const float2 ndc  = (float2(index) + 0.5f) / float2(screen_dimensions);
+    float2 screen_pos = ndc * 2.f - 1.f;
+    screen_pos.y *= -1.f;
+
+    // world position
+    float3 world_pos = mul(float4(screen_pos, -1,1), inv_proj).xyz;
+    world_pos        = mul(float4(world_pos, 1),     inv_view).xyz;
+
+    // direction
+    return normalize(world_pos - origin);
+}
 
 [shader("raygeneration")]
 void ray_generation()
 {
     RaytracingAccelerationStructure scene = ResourceDescriptorHeap[resources.acceleration_structure];
     RWTexture2D<float4> image             = ResourceDescriptorHeap[resources.image];
+    ConstantBuffer<camera_data> camera_cb = ResourceDescriptorHeap[resources.camera_data];
     ConstantBuffer<scene_data> scene_cb   = ResourceDescriptorHeap[resources.scene_data];
-    Texture2D<float4> ray_image           = ResourceDescriptorHeap[resources.ray_image];
 
     ray_payload p;
     p.color = float4(1,0,1,1);
     
     const uint2 launch_index = DispatchRaysIndex().xy;
-    const float3 origin      = scene_cb.origin.xyz;
+    const uint2 screen_dimensions = DispatchRaysDimensions().xy;
+    const float3 origin      = camera_cb.origin.xyz;
 
     RayDesc ray;
     ray.Origin    = origin;
-    ray.Direction = ray_image[launch_index].xyz;
+    ray.Direction = get_direction(launch_index, screen_dimensions, origin, camera_cb.inv_view, camera_cb.inv_proj);
     ray.TMin      = 0.001f;
     ray.TMax      = 1000.f;
 

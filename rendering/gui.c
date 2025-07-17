@@ -418,7 +418,7 @@ void gui_render(void* gui_ctxt, dm_context* context)
         if(c->text_vertex_count[i]==0) continue;
 
         c->text_resources[i].scene_data = c->cb.descriptor_index;
-        c->text_resources[i].texture    = c->fonts[i].texture_handle.descriptor_index;
+        c->text_resources[i].texture    = c->fonts[i].texture_handle.descriptor_index + 1;
         c->text_resources[i].sampler    = app_data->default_sampler.descriptor_index;
 
         dm_render_command_set_root_constants(0,3,0, &c->text_resources[i], context);
