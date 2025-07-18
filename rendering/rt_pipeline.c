@@ -102,6 +102,14 @@ bool rt_pipeline_init(dm_context* context)
             app_data->entities.rt_instances[i].sbt_offset = 0;
             app_data->entities.rt_instances[i].mask = 0xFF;
             app_data->entities.rt_instances[i].blas_address = app_data->rt_data.blas_addresses[CUBE_BLAS];
+
+            app_data->entities.rt_instances[i].transform[0][0] = 1;
+            app_data->entities.rt_instances[i].transform[1][1] = 1;
+            app_data->entities.rt_instances[i].transform[2][2] = 1;
+
+            app_data->entities.rt_instances[i].transform[0][3] = dm_random_float(context) * 50.f - 25.f;
+            app_data->entities.rt_instances[i].transform[1][3] = dm_random_float(context) * 50.f - 25.f;
+            app_data->entities.rt_instances[i].transform[2][3] = dm_random_float(context) * 50.f - 25.f;
         }
         
         dm_storage_buffer_desc desc = { 0 };
@@ -154,14 +162,21 @@ bool rt_pipeline_update(dm_context* context)
 
     dm_memcpy(app_data->rt_data.camera_data.position, app_data->camera.pos, sizeof(dm_vec4));
 
-    app_data->rt_data.scene_data.sky_color[0] = 0.f;
-    app_data->rt_data.scene_data.sky_color[1] = 0.f;
-    app_data->rt_data.scene_data.sky_color[2] = 0.f;
+    app_data->rt_data.scene_data.sky_color[0] = 0.02f;
+    app_data->rt_data.scene_data.sky_color[1] = 0.02f;
+    app_data->rt_data.scene_data.sky_color[2] = 0.02f;
 
     // blas addresses
     if(!dm_renderer_get_blas_gpu_address(app_data->rt_data.cube_blas,     &app_data->rt_data.blas_addresses[CUBE_BLAS], context)) return false;
     if(!dm_renderer_get_blas_gpu_address(app_data->rt_data.triangle_blas, &app_data->rt_data.blas_addresses[TRI_BLAS],  context)) return false;
     if(!dm_renderer_get_blas_gpu_address(app_data->rt_data.quad_blas,     &app_data->rt_data.blas_addresses[QUAD_BLAS], context)) return false;
+
+    // render udpates
+    dm_render_command_update_constant_buffer(&app_data->rt_data.camera_data, sizeof(rt_camera_data), app_data->rt_data.camera_cb, context);
+    dm_render_command_update_constant_buffer(&app_data->rt_data.scene_data, sizeof(scene_cb), app_data->rt_data.scene_cb, context);
+
+    dm_render_command_update_tlas(MAX_ENTITIES, app_data->rt_data.tlas, context);
+    dm_render_command_update_storage_buffer(app_data->rt_data.blas_addresses, sizeof(app_data->rt_data.blas_addresses), app_data->rt_data.blas_buffer, context);
 
     return true;
 }
@@ -177,9 +192,6 @@ bool rt_pipeline_render(dm_context* context)
     app_data->rt_data.resources.scene_data_index       = app_data->rt_data.scene_cb.descriptor_index;
     app_data->rt_data.resources.material_buffer        = app_data->entities.material_sb.descriptor_index;
 
-    // update render objects
-    dm_render_command_update_constant_buffer(&app_data->rt_data.camera_data, sizeof(rt_camera_data), app_data->rt_data.camera_cb, context);
-    dm_render_command_update_constant_buffer(&app_data->rt_data.scene_data, sizeof(scene_cb), app_data->rt_data.scene_cb, context);
     if(app_data->rt_data.resized) 
     {
         dm_render_command_resize_texture(context->renderer.width, context->renderer.height, app_data->rt_data.image, context);
@@ -194,10 +206,3 @@ bool rt_pipeline_render(dm_context* context)
     return true;
 }
 
-void rt_pipeline_update_tlas(dm_context* context)
-{
-    application_data* app_data = context->app_data;
-
-    dm_render_command_update_tlas(MAX_ENTITIES, app_data->rt_data.tlas, context);
-    dm_render_command_update_storage_buffer(app_data->rt_data.blas_addresses, sizeof(app_data->rt_data.blas_addresses), app_data->rt_data.blas_buffer, context);
-}

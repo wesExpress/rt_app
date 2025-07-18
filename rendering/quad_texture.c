@@ -12,10 +12,10 @@ bool quad_texture_init(dm_context* context)
     application_data* app_data = context->app_data;
 
     quad_vertex vertices[] = {
-        { { -1.f,-1.f }, { 0,0 } },
-        { {  1.f,-1.f }, { 1,0 } },
-        { {  1.f, 1.f }, { 1,1 } },
-        { { -1.f, 1.f }, { 0,1 } },
+        { { -1.f,-1.f }, { 0,1 } },
+        { {  1.f,-1.f }, { 1,1 } },
+        { {  1.f, 1.f }, { 1,0 } },
+        { { -1.f, 1.f }, { 0,0 } },
     };
 
     uint32_t indices[] = {

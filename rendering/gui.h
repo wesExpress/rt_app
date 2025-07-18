@@ -26,7 +26,7 @@ void gui_draw_quad(float x, float y, float w, float h, const float* color, void*
 void gui_draw_quad_border(float x, float y, float w, float h, const float* color, float* border_color, void* context);
 void gui_draw_text(float x, float y, const char* input_text, const float* color, uint8_t font_index, void* context);
 
-void gui_update_buffers(void* gui_ctxt, dm_context* context);
+void gui_update(void* gui_ctxt, dm_context* context);
 void gui_render(void* gui_ctxt, dm_context* context);
 
 #endif

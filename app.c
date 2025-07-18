@@ -76,11 +76,6 @@ bool dm_application_update(dm_context* context)
     // camera 
     camera_update(&app_data->camera, context);
 
-    // various updates
-    if(!raster_pipeline_update(context)) return false;
-    if(!rt_pipeline_update(context))     return false;
-    if(!debug_pipeline_update(context))  return false;
-    
     // gui
     static float quad_color[] = { 0.1f,0.1f,0.7f,1.f };
     static float quad_border_color[] = { 0.f,0.f,0.f,1.f };
@@ -115,6 +110,13 @@ bool dm_application_update(dm_context* context)
         app_data->frame_count++;
     }
 
+    // render updates
+    if(!raster_pipeline_update(context)) return false;
+    if(!rt_pipeline_update(context))     return false;
+    if(!debug_pipeline_update(context))  return false;
+    gui_update(app_data->gui_context, context);
+    update_entities(context);
+
     return true;
 }
 
@@ -122,14 +124,9 @@ bool dm_application_render(dm_context* context)
 {
     application_data* app_data = context->app_data;
 
-    update_entities(context);
-
-    gui_update_buffers(app_data->gui_context, context);
-
     // raytracing has to happen outside of a render pass
     if(app_data->ray_trace)
     {
-        rt_pipeline_update_tlas(context);
         if(!rt_pipeline_render(context)) return false;
     }
 
@@ -138,7 +135,6 @@ bool dm_application_render(dm_context* context)
 
     if(app_data->ray_trace)
     {
-        //dm_render_command_copy_image_to_screen(app_data->rt_data.image, context);
         quad_texture_render(app_data->rt_data.image, context);
     }
     else

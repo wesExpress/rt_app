@@ -45,7 +45,7 @@ bool init_entities(dm_context* context)
 
     for(uint32_t i=0; i<MAX_ENTITIES; i++)
     {
-        app_data->entities.transforms[i] = init_transform((float)MAX_ENTITIES * 0.25f, context);
+        app_data->entities.transforms[i] = init_transform((float)MAX_ENTITIES / (2.5f * 27.f), context);
         app_data->entities.phys[i]       = init_physics(context);
 
         app_data->entities.materials[i].vb_index = app_data->raster_data.vb_cube.descriptor_index;
@@ -129,8 +129,12 @@ void update_entities(dm_context* context)
     app_data->entities.resources.rt_instance_buffer = app_data->entities.rt_instance_sb.descriptor_index;
     app_data->entities.resources.blas_buffer        = app_data->rt_data.blas_buffer.descriptor_index;
 
+    dm_compute_command_begin_recording(context);
+
     dm_compute_command_bind_compute_pipeline(app_data->entities.compute_pipeline, context);
     dm_compute_command_set_root_constants(0,5,0, &app_data->entities.resources, context);
     dm_compute_command_dispatch(MAX_ENTITIES / 8,1,1, context);
+
+    dm_compute_command_end_recording(context);
 }
 

@@ -364,7 +364,7 @@ void gui_draw_text(float x, float y, const char* input_text, const float* color,
     }
 }
 
-void gui_update_buffers(void* gui_ctxt, dm_context* context)
+void gui_update(void* gui_ctxt, dm_context* context)
 {
     gui_context* c = gui_ctxt;
 
@@ -376,13 +376,6 @@ void gui_update_buffers(void* gui_ctxt, dm_context* context)
 
         dm_render_command_update_vertex_buffer(c->text_vertices[i], sizeof(c->text_vertices[i]), c->font_vb[i], context);
     }
-}
-
-void gui_render(void* gui_ctxt, dm_context* context)
-{
-    application_data* app_data = context->app_data;
-
-    gui_context* c = gui_ctxt;
 
     if(context->renderer.width != c->screen_width || context->renderer.height != c->screen_height)
     {
@@ -395,6 +388,13 @@ void gui_render(void* gui_ctxt, dm_context* context)
 #endif
     }
     dm_render_command_update_constant_buffer(&c->cb_data, sizeof(c->cb_data), c->cb, context);
+}
+
+void gui_render(void* gui_ctxt, dm_context* context)
+{
+    application_data* app_data = context->app_data;
+
+    gui_context* c = gui_ctxt;
 
     c->quad_resources.scene_data = c->cb.descriptor_index;
 

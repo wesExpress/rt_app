@@ -117,6 +117,8 @@ bool raster_pipeline_update(dm_context* context)
     dm_memcpy(app_data->raster_data.scene_data.view_proj, app_data->camera.vp, sizeof(dm_mat4));
 #endif
 
+    dm_render_command_update_constant_buffer(&app_data->raster_data.scene_data, sizeof(raster_scene_data), app_data->raster_data.cb, context);
+
     return true;
 }
 
@@ -127,7 +129,6 @@ bool raster_pipeline_render(dm_context* context)
     app_data->raster_data.render_data.scene_cb        = app_data->raster_data.cb.descriptor_index;
     app_data->raster_data.render_data.instance_buffer = app_data->entities.instance_sb.descriptor_index;
 
-    dm_render_command_update_constant_buffer(&app_data->raster_data.scene_data, sizeof(raster_scene_data), app_data->raster_data.cb, context);
     dm_render_command_bind_raster_pipeline(app_data->raster_data.pipeline, context);
     dm_render_command_set_root_constants(0,2,0, &app_data->raster_data.render_data, context);
     dm_render_command_bind_vertex_buffer(app_data->raster_data.vb_cube, 0, context);
