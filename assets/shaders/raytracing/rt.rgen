@@ -1,0 +1,80 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_ARB_shading_language_include : enable
+
+#include "..\shader_include.h"
+
+struct payload
+{
+    vec4 color;
+};
+
+struct camera_data
+{
+    mat4 inv_view, inv_proj;
+    vec4 origin;
+};
+
+struct scene_data
+{
+    vec4 sky_color;
+};
+
+layout(push_constant) uniform render_resources
+{
+    uint acceleration_structure_index;
+    uint image_index;
+    uint camera_data_index;
+    uint scene_data_index;
+    uint material_buffer_index;
+};
+
+layout(set=0, binding=0) uniform accelerationStructureEXT acceleration_structures[RESOURCE_HEAP_SIZE];
+
+layout(set=0, binding=0, rgba8) uniform writeonly image2D images[RESOURCE_HEAP_SIZE];
+
+layout(set=0, binding=0) uniform u0 { camera_data data; } camera_uniform[RESOURCE_HEAP_SIZE];
+layout(set=0, binding=0) uniform u1 { scene_data data; } scene_uniform[RESOURCE_HEAP_SIZE];
+
+layout(location=0) rayPayloadEXT payload p;
+
+vec3 get_direction(mat4 inv_proj, mat4 inv_view, vec3 origin, vec2 launch_index, vec2 screen_dimensions)
+{
+    const vec2 ndc  = (launch_index + 0.5f) / screen_dimensions;
+    vec2 screen_pos = ndc * 2.f - 1.f;
+    screen_pos.y *= -1.f;
+
+    // world position
+    vec3 world_pos = (inv_proj * vec4(screen_pos, -1,1)).xyz;
+    world_pos      = (inv_view * vec4(world_pos, 1)).xyz;
+
+    // direction
+    return normalize(world_pos - origin);
+}
+
+void main()
+{
+    vec2 launch_index = gl_LaunchIDEXT.xy;
+    vec2 screen_dimensions = gl_LaunchSizeEXT.xy;
+
+    vec3 origin    = camera_uniform[camera_data_index].data.inv_view[3].xyz;
+    mat4 inv_view  = camera_uniform[camera_data_index].data.inv_view;
+    mat4 inv_proj  = camera_uniform[camera_data_index].data.inv_proj;
+
+    vec3 direction = get_direction(inv_proj, inv_view, origin, launch_index, screen_dimensions);
+
+    p.color = vec4(1,0,1,1);
+
+    traceRayEXT(acceleration_structures[acceleration_structure_index], 
+        gl_RayFlagsOpaqueEXT, 
+        0xFF, 
+        0,1,0, 
+        origin, 
+        0.001, 
+        direction, 
+        1000.0, 
+        0);
+
+    imageStore(images[image_index], ivec2(launch_index), p.color);
+}
+
