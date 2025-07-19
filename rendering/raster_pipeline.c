@@ -2,31 +2,6 @@
 #include "../app.h"
 #include "../data.h"
 
-#ifndef DM_DEBUG
-DM_INLINE
-#endif
-bool create_mesh(const vertex* vertices, uint32_t vertex_count, const index_t* indices, uint32_t index_count, dm_resource_handle* v_handle, dm_resource_handle* i_handle, dm_context* context)
-{
-    dm_vertex_buffer_desc v_desc = {
-        .size=sizeof(vertex) * vertex_count,
-        .element_size=sizeof(float),
-        .stride=sizeof(vertex),
-        .data=(void*)vertices
-    };
-
-    dm_index_buffer_desc i_desc = {
-        .size=sizeof(index_t) * index_count,
-        .element_size=sizeof(index_t),
-        .index_type=INDEX_TYPE,
-        .data=(void*)indices
-    };
-
-    if(!dm_renderer_create_vertex_buffer(v_desc, v_handle, context)) return false;
-    if(!dm_renderer_create_index_buffer(i_desc, i_handle, context)) return false;
-
-    return true;
-}
-#define CREATE_MESH(VERTICES, INDICES, V_HANDLE, I_HANDLE, CONTEXT) create_mesh(VERTICES, _countof(VERTICES), INDICES, _countof(INDICES), V_HANDLE, I_HANDLE, CONTEXT)
 
 bool raster_pipeline_init(dm_context* context)
 {
@@ -34,9 +9,6 @@ bool raster_pipeline_init(dm_context* context)
 
     // === vertex and index buffers ===
     {
-        if(!CREATE_MESH(cube, cube_indices, &app_data->raster_data.vb_cube, &app_data->raster_data.ib_cube, context)) return false;
-        if(!CREATE_MESH(triangle, triangle_indices, &app_data->raster_data.vb_tri, &app_data->raster_data.ib_tri, context)) return false;
-        if(!CREATE_MESH(quad, quad_indices, &app_data->raster_data.vb_quad, &app_data->raster_data.ib_quad, context)) return false;
     }
 
     // === constant buffer ===
@@ -84,11 +56,11 @@ bool raster_pipeline_init(dm_context* context)
         dm_rasterizer_desc rasterizer_desc = { 
             .cull_mode=DM_RASTERIZER_CULL_MODE_BACK, .polygon_fill=DM_RASTERIZER_POLYGON_FILL_FILL, .front_face=DM_RASTERIZER_FRONT_FACE_COUNTER_CLOCKWISE,
 #ifdef DM_DIRECTX12
-            .vertex_shader_desc.path="assets/vertex_shader.cso",
-            .pixel_shader_desc.path="assets/pixel_shader.cso",
+            .vertex_shader_desc.path="assets/shaders/vertex_shader.cso",
+            .pixel_shader_desc.path="assets/shaders/pixel_shader.cso",
 #elif defined(DM_VULKAN)
-            .vertex_shader_desc.path="assets/vertex_shader.spv",
-            .pixel_shader_desc.path="assets/pixel_shader.spv",
+            .vertex_shader_desc.path="assets/shaders/vertex_shader.spv",
+            .pixel_shader_desc.path="assets/shaders/pixel_shader.spv",
 #endif
         };
 
@@ -122,7 +94,7 @@ bool raster_pipeline_update(dm_context* context)
     return true;
 }
 
-bool raster_pipeline_render(dm_context* context)
+bool raster_pipeline_render(dm_mesh mesh, dm_context* context)
 {
     application_data* app_data = context->app_data;
 
@@ -131,9 +103,16 @@ bool raster_pipeline_render(dm_context* context)
 
     dm_render_command_bind_raster_pipeline(app_data->raster_data.pipeline, context);
     dm_render_command_set_root_constants(0,2,0, &app_data->raster_data.render_data, context);
-    dm_render_command_bind_vertex_buffer(app_data->raster_data.vb_cube, 0, context);
-    dm_render_command_bind_index_buffer(app_data->raster_data.ib_cube, context);
-    dm_render_command_draw_instanced_indexed(MAX_ENTITIES,0, _countof(cube_indices),0, 0, context);
+    dm_render_command_bind_vertex_buffer(mesh.vb, 0, context);
+    if(mesh.index_count)
+    {
+        dm_render_command_bind_index_buffer(mesh.ib, context);
+        dm_render_command_draw_instanced_indexed(MAX_ENTITIES,0, mesh.index_count,0, 0, context);
+    }
+    else
+    {
+        dm_render_command_draw_instanced(MAX_ENTITIES,0,mesh.vertex_count,0, context);
+    }
 
     return true;
 }

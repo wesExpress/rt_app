@@ -27,11 +27,11 @@ typedef struct rt_camera_data_t
 typedef struct rt_pipeline_data_t
 {
     dm_resource_handle pipeline;
-    dm_resource_handle cube_blas, triangle_blas, quad_blas;
     dm_resource_handle tlas;
-    dm_resource_handle vb, ib, scene_cb, camera_cb;
+    dm_resource_handle scene_cb, camera_cb;
     dm_resource_handle image;
     dm_resource_handle blas_buffer;
+    dm_resource_handle blas[10];
 
     size_t blas_addresses[10];
     material materials[MAX_ENTITIES];

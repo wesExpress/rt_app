@@ -55,11 +55,11 @@ bool debug_pipeline_init(dm_context* context)
         dm_rasterizer_desc rasterizer_desc = { 
             .cull_mode=DM_RASTERIZER_CULL_MODE_BACK, .polygon_fill=DM_RASTERIZER_POLYGON_FILL_FILL, .front_face=DM_RASTERIZER_FRONT_FACE_COUNTER_CLOCKWISE,
 #ifdef DM_DIRECTX12
-            .vertex_shader_desc.path="assets/debug_vertex.cso",
-            .pixel_shader_desc.path="assets/debug_pixel.cso",
+            .vertex_shader_desc.path="assets/shaders/debug_vertex.cso",
+            .pixel_shader_desc.path="assets/shaders/debug_pixel.cso",
 #elif defined(DM_VULKAN)
-            .vertex_shader_desc.path="assets/debug_vertex.spv",
-            .pixel_shader_desc.path="assets/debug_pixel.spv",
+            .vertex_shader_desc.path="assets/shaders/debug_vertex.spv",
+            .pixel_shader_desc.path="assets/shaders/debug_pixel.spv",
 #endif
         };
 

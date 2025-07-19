@@ -1,8 +1,39 @@
 #include "app.h"
 #include "rendering/gui.h"
 #include "rendering/debug_pipeline.h"
+#include "data.h"
 
 #include <stdio.h>
+
+#ifndef DM_DEBUG
+DM_INLINE
+#endif
+bool create_mesh(const vertex* vertices, uint32_t vertex_count, const index_t* indices, uint32_t index_count, dm_mesh* mesh, dm_context* context)
+{
+    dm_vertex_buffer_desc v_desc = {
+        .size=sizeof(vertex) * vertex_count,
+        .element_size=sizeof(float),
+        .stride=sizeof(vertex),
+        .data=(void*)vertices
+    };
+
+    dm_index_buffer_desc i_desc = {
+        .size=sizeof(index_t) * index_count,
+        .element_size=sizeof(index_t),
+        .index_type=INDEX_TYPE,
+        .data=(void*)indices
+    };
+
+    if(!dm_renderer_create_vertex_buffer(v_desc, &mesh->vb, context)) return false;
+    if(!dm_renderer_create_index_buffer(i_desc, &mesh->ib, context)) return false;
+
+    mesh->vertex_count  = vertex_count;
+    mesh->vertex_stride = sizeof(vertex);
+    mesh->index_count   = index_count;
+
+    return true;
+}
+#define CREATE_MESH(VERTICES, INDICES, MESH, CONTEXT) create_mesh(VERTICES, _countof(VERTICES), INDICES, _countof(INDICES), MESH, CONTEXT)
 
 void dm_application_setup(dm_context_init_packet* init_packet)
 {
@@ -48,6 +79,23 @@ bool dm_application_init(dm_context* context)
         if(!gui_load_font("assets/fonts/JetBrainsMono-Regular.ttf", 32, &app_data->font32, app_data->gui_context, context)) return false;
     }
 
+    // load in models
+    float*   vertices;
+    dm_mesh_vertex_attribute attribs[] = {
+        DM_MESH_VERTEX_ATTRIBUTE_POSITION_4,
+        DM_MESH_VERTEX_ATTRIBUTE_NORMAL_4,
+        DM_MESH_VERTEX_ATTRIBUTE_COLOR_4
+    };
+
+    if(!dm_renderer_load_obj_model("assets/models/standford_bunny.obj", attribs, _countof(attribs),  (void**)&vertices,&app_data->meshes[app_data->mesh_count++], context)) return false;
+    dm_free((void**)&vertices);
+
+    if(!dm_renderer_load_obj_model("assets/models/standford_dragon.obj", attribs, _countof(attribs),  (void**)&vertices,&app_data->meshes[app_data->mesh_count++], context)) return false;
+    dm_free((void**)&vertices);
+
+    if(!CREATE_MESH(cube, cube_indices, &app_data->meshes[app_data->mesh_count++], context)) return false;
+    if(!CREATE_MESH(triangle, triangle_indices, &app_data->meshes[app_data->mesh_count++], context)) return false;
+    if(!CREATE_MESH(quad, quad_indices, &app_data->meshes[app_data->mesh_count++], context)) return false;
     if(!raster_pipeline_init(context)) return false;
     if(!init_entities(context)) return false;
     if(!rt_pipeline_init(context)) return false;
@@ -125,29 +173,13 @@ bool dm_application_render(dm_context* context)
     application_data* app_data = context->app_data;
 
     // raytracing has to happen outside of a render pass
-    if(app_data->ray_trace)
-    {
-        if(!rt_pipeline_render(context)) return false;
-    }
+    if(!rt_pipeline_render(context)) return false;
 
     // render after
     dm_render_command_begin_render_pass(0,0,0,1.f, context);
-
-    if(app_data->ray_trace)
-    {
         quad_texture_render(app_data->rt_data.image, context);
-    }
-    else
-    {
-        if(!raster_pipeline_render(context)) return false;
-    }
-
-    // gui 
-    gui_render(app_data->gui_context, context);
-
-    debug_pipeline_render(context);
-
-    // 
+        gui_render(app_data->gui_context, context);
+        debug_pipeline_render(context);
     dm_render_command_end_render_pass(context);
 
     return true;

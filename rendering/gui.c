@@ -121,11 +121,11 @@ bool gui_init(gui_style style, uint8_t font_count, void** gui_ctxt, dm_context* 
         desc.rasterizer.polygon_fill = DM_RASTERIZER_POLYGON_FILL_FILL;
         desc.rasterizer.front_face   = DM_RASTERIZER_FRONT_FACE_COUNTER_CLOCKWISE;
 #ifdef DM_DIRECTX12
-        dm_strcpy(desc.rasterizer.vertex_shader_desc.path, "assets/quad_vertex.cso");
-        dm_strcpy(desc.rasterizer.pixel_shader_desc.path,  "assets/quad_pixel.cso");
+        dm_strcpy(desc.rasterizer.vertex_shader_desc.path, "assets/shaders/quad_vertex.cso");
+        dm_strcpy(desc.rasterizer.pixel_shader_desc.path,  "assets/shaders/quad_pixel.cso");
 #else
-        dm_strcpy(desc.rasterizer.vertex_shader_desc.path, "assets/quad_vertex.spv");
-        dm_strcpy(desc.rasterizer.pixel_shader_desc.path,  "assets/quad_pixel.spv");
+        dm_strcpy(desc.rasterizer.vertex_shader_desc.path, "assets/shaders/quad_vertex.spv");
+        dm_strcpy(desc.rasterizer.pixel_shader_desc.path,  "assets/shaders/quad_pixel.spv");
 #endif
 
         desc.viewport.type = DM_VIEWPORT_TYPE_DEFAULT;
@@ -170,11 +170,11 @@ bool gui_init(gui_style style, uint8_t font_count, void** gui_ctxt, dm_context* 
         desc.rasterizer.polygon_fill = DM_RASTERIZER_POLYGON_FILL_FILL;
         desc.rasterizer.front_face   = DM_RASTERIZER_FRONT_FACE_COUNTER_CLOCKWISE;
 #ifdef DM_DIRECTX12
-        dm_strcpy(desc.rasterizer.vertex_shader_desc.path, "assets/gui_vertex.cso");
-        dm_strcpy(desc.rasterizer.pixel_shader_desc.path,  "assets/gui_pixel.cso");
+        dm_strcpy(desc.rasterizer.vertex_shader_desc.path, "assets/shaders/gui_vertex.cso");
+        dm_strcpy(desc.rasterizer.pixel_shader_desc.path,  "assets/shaders/gui_pixel.cso");
 #else
-        dm_strcpy(desc.rasterizer.vertex_shader_desc.path, "assets/gui_vertex.spv");
-        dm_strcpy(desc.rasterizer.pixel_shader_desc.path,  "assets/gui_pixel.spv");
+        dm_strcpy(desc.rasterizer.vertex_shader_desc.path, "assets/shaders/gui_vertex.spv");
+        dm_strcpy(desc.rasterizer.pixel_shader_desc.path,  "assets/shaders/gui_pixel.spv");
 #endif
 
         desc.viewport.type = DM_VIEWPORT_TYPE_DEFAULT;

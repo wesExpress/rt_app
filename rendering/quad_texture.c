@@ -47,17 +47,17 @@ bool quad_texture_init(dm_context* context)
     {
         dm_shader_desc vertex_shader_desc = {
 #ifdef DM_DIRECTX12
-            .path="assets/quad_texture_vertex.cso",
+            .path="assets/shaders/quad_texture_vertex.cso",
 #elif defined(DM_VULKAN)
-            .path="assets/quad_texture_vertex.spv"
+            .path="assets/shaders/quad_texture_vertex.spv"
 #endif
         };
 
         dm_shader_desc pixel_shader_desc = {
 #ifdef DM_DIRECTX12
-            .path="assets/quad_texture_pixel.cso",
+            .path="assets/shaders/quad_texture_pixel.cso",
 #elif defined(DM_VULKAN)
-            .path="assets/quad_texture_pixel.spv"
+            .path="assets/shaders/quad_texture_pixel.spv"
 #endif
         };
 

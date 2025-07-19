@@ -11,6 +11,8 @@
 
 #include "camera.h"
 
+#define MAX_MESHES 10
+
 typedef struct application_data_t
 {
     raster_pipeline_data raster_data;
@@ -27,6 +29,9 @@ typedef struct application_data_t
     char       frame_time_text[512];
 
     entity_data entities;
+
+    dm_mesh meshes[MAX_MESHES];
+    uint16_t mesh_count;
 
     simple_camera camera;
 

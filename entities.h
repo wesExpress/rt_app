@@ -3,7 +3,7 @@
 
 #include "dm.h"
 
-#define MAX_ENTITIES (8 << 14)
+#define MAX_ENTITIES (8 << 12)
 
 typedef struct transform_t
 {
@@ -21,6 +21,8 @@ typedef struct material_t
 {
     uint32_t vb_index;
     uint32_t ib_index;
+    uint32_t is_indexed;
+    uint32_t padding;
 } material;
 
 typedef struct physics_t
@@ -46,7 +48,6 @@ typedef struct entity_data
     material  materials[MAX_ENTITIES];
 
     dm_resource_handle transform_sb, instance_sb, rt_instance_sb, physics_sb, material_sb;
-    dm_resource_handle compute_pipeline;
 
     compute_resources resources;
 } entity_data;

@@ -1,13 +1,8 @@
 #include "rt_pipeline.h"
 #include "../app.h"
-#include "../data.h"
 #include "../entities.h"
 
 #include <stdio.h>
-
-#define CUBE_BLAS 0
-#define TRI_BLAS  1
-#define QUAD_BLAS 2
 
 typedef struct ray_payload_t
 {
@@ -36,17 +31,17 @@ bool rt_pipeline_init(dm_context* context)
 #ifdef DM_DIRECTX12
             .shaders[DM_RT_PIPE_HIT_GROUP_STAGE_CLOSEST] = "closest_hit",
 #elif defined(DM_VULKAN)
-            .shaders[DM_RT_PIPE_HIT_GROUP_STAGE_CLOSEST] = "assets/rchit.spv",
+            .shaders[DM_RT_PIPE_HIT_GROUP_STAGE_CLOSEST] = "assets/shaders/rchit.spv",
 #endif
             .flags = DM_RT_PIPE_HIT_GROUP_FLAG_CLOSEST,
         };
 
         dm_raytracing_pipeline_desc rt_pipe_desc = {  
 #ifdef DM_DIRECTX12
-            .shader_path = "assets/rt_shader.cso",
+            .shader_path = "assets/shaders/rt_shader.cso",
             .raygen = "ray_generation", .miss = "miss",
 #elif defined(DM_VULKAN)
-            .raygen="assets/rgen.spv", .miss="assets/rmiss.spv",
+            .raygen="assets/shaders/rgen.spv", .miss="assets/shaders/rmiss.spv",
 #endif
             .hit_groups[0]=hit_group, .hit_group_count=1,
             .payload_size=sizeof(ray_payload), .max_depth=1, .max_instance_count=MAX_ENTITIES
@@ -57,33 +52,26 @@ bool rt_pipeline_init(dm_context* context)
 
     // === bottom-levels ===
     {
-        dm_blas_desc blas_cube = { 
-            .flags=DM_BLAS_GEOMETRY_FLAG_OPAQUE, .geometry_type=DM_BLAS_GEOMETRY_TYPE_TRIANGLES, .vertex_type=DM_BLAS_VERTEX_TYPE_FLOAT_3,
-            .vertex_count=_countof(cube), .vertex_buffer=app_data->raster_data.vb_cube, .vertex_stride=sizeof(vertex), 
-            .index_count=_countof(cube_indices), .index_buffer=app_data->raster_data.ib_cube, .index_type=INDEX_TYPE
-        };
-        if(!dm_renderer_create_blas(blas_cube, &app_data->rt_data.cube_blas, context)) return false;
-        
-        dm_blas_desc blas_tri = { 
-            .flags=DM_BLAS_GEOMETRY_FLAG_OPAQUE, .geometry_type=DM_BLAS_GEOMETRY_TYPE_TRIANGLES, .vertex_type=DM_BLAS_VERTEX_TYPE_FLOAT_3,
-            .vertex_count=_countof(triangle), .vertex_buffer=app_data->raster_data.vb_tri, .vertex_stride=sizeof(vertex), 
-            .index_count=_countof(triangle_indices), .index_buffer=app_data->raster_data.ib_tri, .index_type=INDEX_TYPE
-        };
-        if(!dm_renderer_create_blas(blas_tri, &app_data->rt_data.triangle_blas, context)) return false;
+        for(uint32_t i=0; i<app_data->mesh_count; i++)
+        {
+            dm_blas_desc desc = { 0 };
+            desc.geometry_type = DM_BLAS_GEOMETRY_TYPE_TRIANGLES;
+            desc.flags         = DM_BLAS_GEOMETRY_FLAG_OPAQUE;
+            desc.vertex_type   = DM_BLAS_VERTEX_TYPE_FLOAT_3;
+            desc.vertex_count  = app_data->meshes[i].vertex_count;
+            desc.vertex_buffer = app_data->meshes[i].vb;
+            desc.vertex_stride = app_data->meshes[i].vertex_stride;
 
-        dm_blas_desc blas_quad = { 
-            .flags=DM_BLAS_GEOMETRY_FLAG_OPAQUE, .geometry_type=DM_BLAS_GEOMETRY_TYPE_TRIANGLES, .vertex_type=DM_BLAS_VERTEX_TYPE_FLOAT_3,
-            .vertex_count=_countof(quad), .vertex_buffer=app_data->raster_data.vb_quad, .vertex_stride=sizeof(vertex), 
-            .index_count=_countof(quad_indices), .index_buffer=app_data->raster_data.ib_quad, .index_type=INDEX_TYPE
-        };
-        if(!dm_renderer_create_blas(blas_quad, &app_data->rt_data.quad_blas, context)) return false;
+            if(!dm_renderer_create_blas(desc, &app_data->rt_data.blas[i], context)) return false;
+        }
     }
 
     // === blas buffer ===
     {
-        if(!dm_renderer_get_blas_gpu_address(app_data->rt_data.cube_blas,     &app_data->rt_data.blas_addresses[CUBE_BLAS], context)) return false;
-        if(!dm_renderer_get_blas_gpu_address(app_data->rt_data.triangle_blas, &app_data->rt_data.blas_addresses[TRI_BLAS],  context)) return false;
-        if(!dm_renderer_get_blas_gpu_address(app_data->rt_data.quad_blas,     &app_data->rt_data.blas_addresses[QUAD_BLAS], context)) return false;
+        for(uint16_t i=0; i<app_data->mesh_count; i++)
+        {
+            if(!dm_renderer_get_blas_gpu_address(app_data->rt_data.blas[i], &app_data->rt_data.blas_addresses[i], context)) return false;
+        }
 
         dm_storage_buffer_desc desc = { 0 };
         desc.write  = false;
@@ -101,7 +89,7 @@ bool rt_pipeline_init(dm_context* context)
             app_data->entities.rt_instances[i].id = i;
             app_data->entities.rt_instances[i].sbt_offset = 0;
             app_data->entities.rt_instances[i].mask = 0xFF;
-            app_data->entities.rt_instances[i].blas_address = app_data->rt_data.blas_addresses[CUBE_BLAS];
+            app_data->entities.rt_instances[i].blas_address = app_data->rt_data.blas_addresses[0];
 
             app_data->entities.rt_instances[i].transform[0][0] = 1;
             app_data->entities.rt_instances[i].transform[1][1] = 1;
@@ -167,16 +155,17 @@ bool rt_pipeline_update(dm_context* context)
     app_data->rt_data.scene_data.sky_color[2] = 0.02f;
 
     // blas addresses
-    if(!dm_renderer_get_blas_gpu_address(app_data->rt_data.cube_blas,     &app_data->rt_data.blas_addresses[CUBE_BLAS], context)) return false;
-    if(!dm_renderer_get_blas_gpu_address(app_data->rt_data.triangle_blas, &app_data->rt_data.blas_addresses[TRI_BLAS],  context)) return false;
-    if(!dm_renderer_get_blas_gpu_address(app_data->rt_data.quad_blas,     &app_data->rt_data.blas_addresses[QUAD_BLAS], context)) return false;
+    for(uint16_t i=0; i<app_data->mesh_count; i++)
+    {
+        if(!dm_renderer_get_blas_gpu_address(app_data->rt_data.blas[i], &app_data->rt_data.blas_addresses[i], context)) return false;
+    }
 
     // render udpates
+    dm_render_command_update_storage_buffer(app_data->rt_data.blas_addresses, sizeof(app_data->rt_data.blas_addresses), app_data->rt_data.blas_buffer, context);
     dm_render_command_update_constant_buffer(&app_data->rt_data.camera_data, sizeof(rt_camera_data), app_data->rt_data.camera_cb, context);
     dm_render_command_update_constant_buffer(&app_data->rt_data.scene_data, sizeof(scene_cb), app_data->rt_data.scene_cb, context);
 
     dm_render_command_update_tlas(MAX_ENTITIES, app_data->rt_data.tlas, context);
-    dm_render_command_update_storage_buffer(app_data->rt_data.blas_addresses, sizeof(app_data->rt_data.blas_addresses), app_data->rt_data.blas_buffer, context);
 
     return true;
 }

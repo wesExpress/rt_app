@@ -22,9 +22,6 @@ typedef struct compute_data_t
 typedef struct raster_pipeline_data_t
 {
     dm_resource_handle pipeline;
-    dm_resource_handle vb_cube, ib_cube;
-    dm_resource_handle vb_tri, ib_tri;
-    dm_resource_handle vb_quad, ib_quad;
     dm_resource_handle cb, compute_cb;
 
     render_resources  render_data;
@@ -35,6 +32,6 @@ typedef struct raster_pipeline_data_t
 
 bool raster_pipeline_init(dm_context* context);
 bool raster_pipeline_update(dm_context* context);
-bool raster_pipeline_render(dm_context* context);
+bool raster_pipeline_render(dm_mesh mesh, dm_context* context);
 
 #endif

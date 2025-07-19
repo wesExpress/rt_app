@@ -12,9 +12,10 @@ transform init_transform(float world_scale, dm_context* context)
     t.position[1] = dm_random_float(context) * world_scale - world_scale * 0.5f;
     t.position[2] = dm_random_float(context) * world_scale - world_scale * 0.5f;
 
-    t.scale[0] = dm_random_float(context) * 2.5f;
-    t.scale[1] = dm_random_float(context) * 2.5f;
-    t.scale[2] = dm_random_float(context) * 2.5f;
+    float scaling = dm_random_float(context) * 1.5f;
+    t.scale[0] = scaling;
+    t.scale[1] = scaling;
+    t.scale[2] = scaling;
 
     t.orientation[0] = dm_random_float(context) * 2.f - 1.f;
     t.orientation[1] = dm_random_float(context) * 2.f - 1.f;
@@ -45,11 +46,11 @@ bool init_entities(dm_context* context)
 
     for(uint32_t i=0; i<MAX_ENTITIES; i++)
     {
-        app_data->entities.transforms[i] = init_transform((float)MAX_ENTITIES / (2.5f * 27.f), context);
+        app_data->entities.transforms[i] = init_transform(100.f, context);
         app_data->entities.phys[i]       = init_physics(context);
 
-        app_data->entities.materials[i].vb_index = app_data->raster_data.vb_cube.descriptor_index;
-        app_data->entities.materials[i].ib_index = app_data->raster_data.ib_cube.descriptor_index;
+        app_data->entities.materials[i].vb_index = app_data->meshes[0].vb.descriptor_index;
+        app_data->entities.materials[i].ib_index = app_data->meshes[0].ib.descriptor_index;
     }
 
     return true;
@@ -103,18 +104,6 @@ bool init_entity_pipeline(dm_context* context)
         if(!dm_renderer_create_storage_buffer(desc, &app_data->entities.material_sb, context)) return false;
     }
 
-    // === compute pipeline ===
-    {
-        dm_compute_pipeline_desc desc = { 0 };
-#ifdef DM_DIRECTX12
-        dm_strcpy(desc.shader.path, "assets/update_entities.cso");
-#elif defined(DM_VULKAN)
-        dm_strcpy(desc.shader.path, "assets/update_entities.spv");
-#endif
-
-        if(!dm_compute_create_compute_pipeline(desc, &app_data->entities.compute_pipeline, context)) return false;
-    }
-
     return true;
 }
 
@@ -122,19 +111,51 @@ void update_entities(dm_context* context)
 {
     application_data* app_data = context->app_data;
 
-    // update the transforms and compute model matrices
-    app_data->entities.resources.transform_buffer   = app_data->entities.transform_sb.descriptor_index;
-    app_data->entities.resources.physics_buffer     = app_data->entities.physics_sb.descriptor_index;
-    app_data->entities.resources.instance_buffer    = app_data->entities.instance_sb.descriptor_index;
-    app_data->entities.resources.rt_instance_buffer = app_data->entities.rt_instance_sb.descriptor_index;
-    app_data->entities.resources.blas_buffer        = app_data->rt_data.blas_buffer.descriptor_index;
+    for(uint32_t i=0; i<MAX_ENTITIES; i++)
+    {
+        transform t = app_data->entities.transforms[i];
+        physics   p = app_data->entities.phys[i];
 
-    dm_compute_command_begin_recording(context);
+        dm_mat4 translation, rotation, scaling, model;
+    
+        dm_mat_translate_make(t.position, translation);
+        dm_mat4_rotate_from_quat(t.orientation, rotation);
+        dm_mat_scale_make(t.scale, scaling);
 
-    dm_compute_command_bind_compute_pipeline(app_data->entities.compute_pipeline, context);
-    dm_compute_command_set_root_constants(0,5,0, &app_data->entities.resources, context);
-    dm_compute_command_dispatch(MAX_ENTITIES / 8,1,1, context);
+        dm_mat4_identity(model);
+        dm_mat4_mul_mat4(model, scaling, model);
+        dm_mat4_mul_mat4(model, rotation, model);
+        dm_mat4_mul_mat4(model, translation, model);
 
-    dm_compute_command_end_recording(context);
+        dm_vec3 delta_rot;
+        dm_quat delta_quat;
+        dm_vec3_scale(p.w, context->delta, delta_rot);
+        dm_vec3_mul_quat(delta_rot, t.orientation, delta_quat);
+        dm_quat_add_quat(t.orientation, delta_quat, t.orientation);
+
+        app_data->entities.transforms[i] = t;
+
+#ifdef DM_DIRECTX12
+        dm_mat4_transpose(model, model);
+        dm_memcpy(app_data->entities.instances[i].model, model, sizeof(model));
+        dm_memcpy(app_data->entities.rt_instances[i].transform, model, sizeof(float) * 3 * 4);
+#elif defined(DM_VULKAN)
+        dm_mat4_transpose(model, model);
+        dm_memcpy(app_data->entities.rt_instances[i].transform, model, sizeof(float) * 3 * 4);
+        dm_memcpy(app_data->entities.instances[i].model, model, sizeof(model));
+#endif
+
+        app_data->entities.rt_instances[i].blas_address = app_data->rt_data.blas_addresses[1];
+        app_data->entities.rt_instances[i].mask         = 0xFF;
+        app_data->entities.rt_instances[i].id           = i;
+
+        app_data->entities.materials[i].vb_index   = app_data->meshes[1].vb.descriptor_index;
+        app_data->entities.materials[i].ib_index   = app_data->meshes[1].ib.descriptor_index;
+        app_data->entities.materials[i].is_indexed = 0;
+    }
+
+    dm_render_command_update_storage_buffer(app_data->entities.instances, sizeof(app_data->entities.instances), app_data->entities.instance_sb, context);
+    dm_render_command_update_storage_buffer(app_data->entities.rt_instances, sizeof(app_data->entities.rt_instances), app_data->entities.rt_instance_sb, context);
+    dm_render_command_update_storage_buffer(app_data->entities.materials, sizeof(app_data->entities.materials), app_data->entities.material_sb, context);
 }
 
