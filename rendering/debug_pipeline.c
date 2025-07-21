@@ -123,6 +123,8 @@ void debug_pipeline_draw_transform(dm_vec3 origin, dm_quat orientation, float le
 bool debug_pipeline_update(dm_context* context)
 {
     application_data* app_data = context->app_data;
+
+    if(app_data->debug_data.vertex_count==0) return true;
     
     dm_render_command_update_vertex_buffer(app_data->debug_data.vertices, sizeof(app_data->debug_data.vertices), app_data->debug_data.vb, context);
     dm_render_command_update_index_buffer(app_data->debug_data.indices, sizeof(app_data->debug_data.indices), app_data->debug_data.ib, context);
@@ -136,14 +138,13 @@ bool debug_pipeline_render(dm_context* context)
 {
     application_data* app_data = context->app_data;
 
-    if(app_data->debug_data.vertex_count)
-    {
-        dm_render_command_bind_raster_pipeline(app_data->debug_data.pipeline, context);
-        dm_render_command_bind_vertex_buffer(app_data->debug_data.vb, 0, context);
-        dm_render_command_bind_index_buffer(app_data->debug_data.ib, context);
-        dm_render_command_set_root_constants(0,1,0, &app_data->debug_data.resources, context);
-        dm_render_command_draw_instanced_indexed(app_data->debug_data.vertex_count / 2,0, app_data->debug_data.index_count,0, 0, context);
-    }
+    if(app_data->debug_data.vertex_count==0) return true;
+    
+    dm_render_command_bind_raster_pipeline(app_data->debug_data.pipeline, context);
+    dm_render_command_bind_vertex_buffer(app_data->debug_data.vb, 0, context);
+    dm_render_command_bind_index_buffer(app_data->debug_data.ib, context);
+    dm_render_command_set_root_constants(0,1,0, &app_data->debug_data.resources, context);
+    dm_render_command_draw_instanced_indexed(app_data->debug_data.vertex_count / 2,0, app_data->debug_data.index_count,0, 0, context);
 
     //
     app_data->debug_data.vertex_count = 0;

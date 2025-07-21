@@ -13,7 +13,6 @@ struct render_resources
 };
 
 ConstantBuffer<render_resources> resources : register(b0);
-SamplerState test : register(s0);
 
 float4 main(PS_INPUT input) : SV_Target
 {

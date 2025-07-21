@@ -54,7 +54,12 @@ bool dm_application_init(dm_context* context)
     dm_timer_start(&app_data->frame_timer, context);
     dm_timer_start(&app_data->fps_timer, context);
 
-    if(!dm_renderer_create_sampler(&app_data->default_sampler, context)) return false;
+    dm_sampler_desc sampler_desc = { 0 };
+    sampler_desc.address_u = DM_SAMPLER_ADDRESS_MODE_WRAP;
+    sampler_desc.address_v = DM_SAMPLER_ADDRESS_MODE_WRAP;
+    sampler_desc.address_w = DM_SAMPLER_ADDRESS_MODE_WRAP;
+        
+    if(!dm_renderer_create_sampler(sampler_desc, &app_data->default_sampler, context)) return false;
 
     // gui
     {
@@ -80,22 +85,20 @@ bool dm_application_init(dm_context* context)
     }
 
     // load in models
-    float*   vertices;
     dm_mesh_vertex_attribute attribs[] = {
-        DM_MESH_VERTEX_ATTRIBUTE_POSITION_4,
-        DM_MESH_VERTEX_ATTRIBUTE_NORMAL_4,
-        DM_MESH_VERTEX_ATTRIBUTE_COLOR_4
+        DM_MESH_VERTEX_ATTRIBUTE_POSITION_3_TEX_COORD_U,
+        DM_MESH_VERTEX_ATTRIBUTE_NORMAL_3_TEX_COOR_V
     };
 
-    if(!dm_renderer_load_obj_model("assets/models/standford_bunny.obj", attribs, _countof(attribs),  (void**)&vertices,&app_data->meshes[app_data->mesh_count++], context)) return false;
-    dm_free((void**)&vertices);
+    for(uint32_t i=0; i<MAX_MESHES; i++)
+    {
+        app_data->meshes[i].sampler = app_data->default_sampler;
+    }
 
-    if(!dm_renderer_load_obj_model("assets/models/standford_dragon.obj", attribs, _countof(attribs),  (void**)&vertices,&app_data->meshes[app_data->mesh_count++], context)) return false;
-    dm_free((void**)&vertices);
+    //if(!dm_renderer_load_obj_model("assets/models/stanford_bunny.obj", attribs, _countof(attribs), &app_data->meshes[app_data->mesh_count++], context)) return false;
+    //if(!dm_renderer_load_obj_model("assets/models/stanford_dragon.obj", attribs, _countof(attribs), &app_data->meshes[app_data->mesh_count++], context)) return false;
+    if(!dm_renderer_load_gltf_model("assets/models/DamagedHelmet.glb", attribs, _countof(attribs), 0, &app_data->meshes[app_data->mesh_count++], context)) return false;
 
-    if(!CREATE_MESH(cube, cube_indices, &app_data->meshes[app_data->mesh_count++], context)) return false;
-    if(!CREATE_MESH(triangle, triangle_indices, &app_data->meshes[app_data->mesh_count++], context)) return false;
-    if(!CREATE_MESH(quad, quad_indices, &app_data->meshes[app_data->mesh_count++], context)) return false;
     if(!raster_pipeline_init(context)) return false;
     if(!init_entities(context)) return false;
     if(!rt_pipeline_init(context)) return false;
@@ -173,11 +176,12 @@ bool dm_application_render(dm_context* context)
     application_data* app_data = context->app_data;
 
     // raytracing has to happen outside of a render pass
-    if(!rt_pipeline_render(context)) return false;
+    //rt_pipeline_render(context);
 
     // render after
     dm_render_command_begin_render_pass(0,0,0,1.f, context);
-        quad_texture_render(app_data->rt_data.image, context);
+        //quad_texture_render(app_data->rt_data.image, context);
+        raster_pipeline_render(app_data->meshes[0], MAX_ENTITIES, context);
         gui_render(app_data->gui_context, context);
         debug_pipeline_render(context);
     dm_render_command_end_render_pass(context);

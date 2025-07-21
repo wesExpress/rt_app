@@ -396,13 +396,12 @@ void gui_render(void* gui_ctxt, dm_context* context)
 
     gui_context* c = gui_ctxt;
 
-    c->quad_resources.scene_data = c->cb.descriptor_index;
-
     // quads
     if(c->quad_vertex_count)
     {
+        c->quad_resources.scene_data = c->cb.descriptor_index;
         dm_render_command_bind_raster_pipeline(c->quad_pipe, context);
-        dm_render_command_set_root_constants(0,2,0, &c->quad_resources, context);
+        dm_render_command_set_root_constants(0,1,0, &c->quad_resources, context);
         dm_render_command_bind_vertex_buffer(c->quad_vb, 0, context);
         dm_render_command_draw_instanced(1,0, c->quad_vertex_count,0, context);
 

@@ -13,6 +13,7 @@ typedef struct quad_texture_data_t
 {
     dm_resource_handle pipeline;
     dm_resource_handle vb, ib;
+    dm_resource_handle sb;
 
     quad_texture_resources resources;
 } quad_texture_data;

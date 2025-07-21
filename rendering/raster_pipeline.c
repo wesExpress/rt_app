@@ -1,7 +1,11 @@
 #include "raster_pipeline.h"
 #include "../app.h"
-#include "../data.h"
 
+typedef struct raster_vertex_t
+{
+    dm_vec4 position;
+    dm_vec4 normal;
+} raster_vertex;
 
 bool raster_pipeline_init(dm_context* context)
 {
@@ -9,6 +13,13 @@ bool raster_pipeline_init(dm_context* context)
 
     // === vertex and index buffers ===
     {
+        dm_vertex_buffer_desc desc = { 0 };
+        desc.stride = sizeof(raster_inst);
+        desc.size   = sizeof(app_data->raster_data.instances);
+        desc.data   = NULL;
+        desc.element_size = sizeof(float);
+
+        if(!dm_renderer_create_vertex_buffer(desc, &app_data->raster_data.inst_vb, context)) return false;
     }
 
     // === constant buffer ===
@@ -27,28 +38,28 @@ bool raster_pipeline_init(dm_context* context)
             .name="POSITION", 
             .format=DM_INPUT_ELEMENT_FORMAT_FLOAT_4, 
             .class=DM_INPUT_ELEMENT_CLASS_PER_VERTEX, 
-            .stride=sizeof(vertex), 
-            .offset=offsetof(vertex, pos)
+            .stride=sizeof(raster_vertex), 
+            .offset=offsetof(raster_vertex, position)
         };
 
         dm_input_element_desc normal_element = {
             .name="NORMAL",
             .format=DM_INPUT_ELEMENT_FORMAT_FLOAT_4,
             .class=DM_INPUT_ELEMENT_CLASS_PER_VERTEX,
-            .stride=sizeof(vertex),
-            .offset=offsetof(vertex, normal)
+            .stride=sizeof(raster_vertex),
+            .offset=offsetof(raster_vertex, normal)
         };
 
-        dm_input_element_desc color_element = {
-            .name="COLOR",
-            .format=DM_INPUT_ELEMENT_FORMAT_FLOAT_4,
-            .class=DM_INPUT_ELEMENT_CLASS_PER_VERTEX,
-            .stride=sizeof(vertex),
-            .offset=offsetof(vertex, color)
+        dm_input_element_desc model_element = {
+            .name="MODEL",
+            .format=DM_INPUT_ELEMENT_FORMAT_MATRIX_4x4,
+            .class=DM_INPUT_ELEMENT_CLASS_PER_INSTANCE,
+            .stride=sizeof(raster_inst),
+            .offset=offsetof(raster_inst, model)
         };
 
         dm_raster_input_assembler_desc input_assembler = {
-            .input_elements = { pos_element,normal_element,color_element }, .input_element_count=3,
+            .input_elements = { pos_element,normal_element,model_element }, .input_element_count=3,
             .topology=DM_INPUT_TOPOLOGY_TRIANGLE_LIST
         };
 
@@ -94,25 +105,28 @@ bool raster_pipeline_update(dm_context* context)
     return true;
 }
 
-bool raster_pipeline_render(dm_mesh mesh, dm_context* context)
+void raster_pipeline_render(dm_mesh mesh, uint32_t count, dm_context* context)
 {
+    if(count==0) return;
+
     application_data* app_data = context->app_data;
 
-    app_data->raster_data.render_data.scene_cb        = app_data->raster_data.cb.descriptor_index;
-    app_data->raster_data.render_data.instance_buffer = app_data->entities.instance_sb.descriptor_index;
+    app_data->raster_data.render_data.scene_cb              = app_data->raster_data.cb.descriptor_index;
+    app_data->raster_data.render_data.sampler_index         = mesh.sampler.descriptor_index;
+    app_data->raster_data.render_data.diffuse_texture_index = mesh.diffuse_texture.descriptor_index + 1;
 
     dm_render_command_bind_raster_pipeline(app_data->raster_data.pipeline, context);
-    dm_render_command_set_root_constants(0,2,0, &app_data->raster_data.render_data, context);
+    dm_render_command_set_root_constants(0,3,0, &app_data->raster_data.render_data, context);
     dm_render_command_bind_vertex_buffer(mesh.vb, 0, context);
+    dm_render_command_bind_vertex_buffer(app_data->raster_data.inst_vb, 1, context);
+
     if(mesh.index_count)
     {
         dm_render_command_bind_index_buffer(mesh.ib, context);
-        dm_render_command_draw_instanced_indexed(MAX_ENTITIES,0, mesh.index_count,0, 0, context);
+        dm_render_command_draw_instanced_indexed(count,0, mesh.index_count,0, 0, context);
     }
     else
     {
-        dm_render_command_draw_instanced(MAX_ENTITIES,0,mesh.vertex_count,0, context);
+        dm_render_command_draw_instanced(count,0,mesh.vertex_count,0, context);
     }
-
-    return true;
 }

@@ -1,12 +1,23 @@
-#version 450
+#version 460
 
-layout(location = 0) in  vec3 fragment_normal;
-layout(location = 1) in  vec4 fragment_color;
+#include "../shader_include.h"
+
+layout(location = 0) in  vec2 fragment_tex_coords;
 
 layout(location = 0) out vec4 pixel_color;
 
+layout(push_constant) uniform render_resources
+{
+    uint camera_data_index;
+    uint sampler_index;
+    uint diffuse_texture_index;
+};
+
+layout(set=0, binding=0) uniform texture2D textures[RESOURCE_HEAP_SIZE];
+layout(set=1, binding=0) uniform sampler   samplers[SAMPLER_HEAP_SIZE];
+
 void main()
 {
-    pixel_color = fragment_color;
+    pixel_color = texture(sampler2D(textures[diffuse_texture_index], samplers[sampler_index]), fragment_tex_coords);
 }
 

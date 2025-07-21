@@ -3,7 +3,7 @@
 
 #include "dm.h"
 
-#define MAX_ENTITIES (8 << 12)
+#define MAX_ENTITIES (8 << 4) 
 
 typedef struct transform_t
 {
@@ -12,17 +12,12 @@ typedef struct transform_t
     dm_quat orientation;
 } transform;
 
-typedef struct instance_t 
-{
-    dm_mat4 model;
-} instance;
-
 typedef struct material_t
 {
     uint32_t vb_index;
     uint32_t ib_index;
     uint32_t is_indexed;
-    uint32_t padding;
+    uint32_t diffuse_texture_index;
 } material;
 
 typedef struct physics_t
@@ -42,7 +37,6 @@ typedef struct compute_resources_t
 typedef struct entity_data
 {
     transform transforms[MAX_ENTITIES];
-    instance  instances[MAX_ENTITIES];
     dm_raytracing_instance rt_instances[MAX_ENTITIES];
     physics   phys[MAX_ENTITIES];
     material  materials[MAX_ENTITIES];

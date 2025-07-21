@@ -1,21 +1,22 @@
-struct PIXEL_IN 
+struct FRAGMENT_IN 
 {
-    float4 pos       : SV_POSITION;
-    float3 normal    : NORMAL1;
-    float4 color     : COLOR1;
-    float4 world_pos : POSITION1;
+    float4 pos        : SV_POSITION;
+    float2 tex_coords : TEX_COORDS1;
 };
 
-struct PIXEL_OUT
+struct render_resources 
 {
-    float4 color : SV_TARGET;
+    uint scene_cb;
+    uint sampler_index;
+    uint diffuse_texture_index;
 };
 
-PIXEL_OUT main(PIXEL_IN p_in)
-{
-    PIXEL_OUT p_out;
+ConstantBuffer<render_resources> resources : register(b0);
 
-    p_out.color = p_in.color;
-    
-    return p_out;
+float4 main(FRAGMENT_IN frag_in) : SV_Target
+{
+    Texture2D    texture = ResourceDescriptorHeap[resources.diffuse_texture_index];
+    SamplerState sampler = SamplerDescriptorHeap[resources.sampler_index];
+
+    return texture.Sample(sampler, frag_in.tex_coords);
 }
