@@ -14,7 +14,9 @@ struct material
     uint ib_index;
     uint is_indexed;
     uint diffuse_texture_index;
+    uint normal_map_index;
     uint sampler_index;
+    uint padding[2];
 };
 
 layout(push_constant) uniform render_resources

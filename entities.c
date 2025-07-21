@@ -142,6 +142,7 @@ void update_entities(dm_context* context)
         app_data->entities.materials[i].ib_index   = app_data->meshes[mesh_index].ib.descriptor_index;
         app_data->entities.materials[i].is_indexed = app_data->meshes[mesh_index].index_type==DM_INDEX_BUFFER_INDEX_TYPE_UNKNOWN ? 0 : 1;
         app_data->entities.materials[i].diffuse_texture_index = app_data->meshes[mesh_index].diffuse_texture.descriptor_index+1;
+        app_data->entities.materials[i].normal_map_index = app_data->meshes[mesh_index].normal_map.descriptor_index+1;
         app_data->entities.materials[i].sampler_index = app_data->meshes[mesh_index].sampler.descriptor_index;
     }
 

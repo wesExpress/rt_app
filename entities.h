@@ -3,7 +3,7 @@
 
 #include "dm.h"
 
-#define MAX_ENTITIES (8 << 12) 
+#define MAX_ENTITIES (8 << 8) 
 
 typedef struct transform_t
 {
@@ -18,7 +18,9 @@ typedef struct material_t
     uint32_t ib_index;
     uint32_t is_indexed;
     uint32_t diffuse_texture_index;
+    uint32_t normal_map_index;
     uint32_t sampler_index;
+    uint32_t padding[2];
 } material;
 
 typedef struct physics_t
