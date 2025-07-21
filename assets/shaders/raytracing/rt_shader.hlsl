@@ -196,8 +196,6 @@ void closest_hit(inout ray_payload p, BuiltInTriangleIntersectionAttributes attr
     float3 normal = normalize(cross(ab, ac));
 #endif
 
-    //p.color.rgb = diffuse_texture.Load(int3(coords, 0)).rgb;
-    //p.color.rgb = diffuse_texture.Sample(sampler, uv).rgb;
-    p.color.rgb = diffuse_texture.SampleGrad(sampler, uv, 0,0).rgb;
+    p.color = diffuse_texture.SampleGrad(sampler, uv, 0,0);
 }
 

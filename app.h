@@ -27,6 +27,7 @@ typedef struct application_data_t
 
     char       fps_text[512];
     char       frame_time_text[512];
+    char gpu_time_text[512];
 
     entity_data entities;
 

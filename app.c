@@ -120,6 +120,10 @@ bool dm_application_update(dm_context* context)
 {
     application_data* app_data = context->app_data;
 
+    char t[512];
+    static const float fps_color[] = { 1.f,1.f,1.f,1.f };
+    static const float frame_timer_color[] = { 1.f,1.f,1.f,1.f };
+
     double frame_time = dm_timer_elapsed_ms(&app_data->frame_timer, context);
     sprintf(app_data->frame_time_text, "Frame time: %0.2lf ms", frame_time);
     dm_timer_start(&app_data->frame_timer, context);
@@ -128,25 +132,20 @@ bool dm_application_update(dm_context* context)
     camera_update(&app_data->camera, context);
 
     // gui
-    static float quad_color[] = { 0.1f,0.1f,0.7f,1.f };
-    static float quad_border_color[] = { 0.f,0.f,0.f,1.f };
+    static float quad_color[] = { 0.1f,0.1f,0.7f,.8f };
+    static float quad_border_color[] = { 0.f,0.f,0.f,.8f };
 
     gui_draw_quad_border(100.f,100.f, 500.f,200.f, quad_color, quad_border_color, app_data->gui_context);
 
-    static const float fps_color[] = { 1.f,1.f,1.f,1.f };
-    static const float frame_timer_color[] = { 1.f,1.f,1.f,1.f };
-
-    char t[512];
+    gui_draw_text(110.f,105.f, app_data->fps_text,        fps_color, app_data->font16, app_data->gui_context);
     sprintf(t, "Instance count: %u", MAX_ENTITIES);
-
-    gui_draw_text(110.f,110.f, app_data->fps_text,        fps_color, app_data->font16, app_data->gui_context);
-    gui_draw_text(110.f,160.f, app_data->frame_time_text, frame_timer_color, app_data->font32, app_data->gui_context);
-    gui_draw_text(110.f,210.f, t, fps_color, app_data->font16, app_data->gui_context); 
+    gui_draw_text(110.f,120.f, t, fps_color, app_data->font16, app_data->gui_context); 
+    gui_draw_text(110.f,155.f, app_data->frame_time_text, frame_timer_color, app_data->font32, app_data->gui_context);
 
     sprintf(t, "Camera pos: %f %f %f", app_data->camera.pos[0], app_data->camera.pos[1], app_data->camera.pos[2]);
-    gui_draw_text(110.f,250.f, t, fps_color, app_data->font16, app_data->gui_context);
+    gui_draw_text(110.f,245.f, t, fps_color, app_data->font16, app_data->gui_context);
     sprintf(t, "Camera forward: %f %f %f", app_data->camera.forward[0], app_data->camera.forward[1], app_data->camera.forward[2]);
-    gui_draw_text(110.f,270.f, t, fps_color, app_data->font16, app_data->gui_context);
+    gui_draw_text(110.f,265.f, t, fps_color, app_data->font16, app_data->gui_context);
 
     if(dm_input_key_just_pressed(DM_KEY_SPACE, context)) app_data->ray_trace = !app_data->ray_trace;
 
@@ -180,8 +179,8 @@ bool dm_application_render(dm_context* context)
 
     // render after
     dm_render_command_begin_render_pass(0,0,0,1.f, context);
-        //quad_texture_render(app_data->rt_data.image, context);
-        raster_pipeline_render(app_data->meshes[0], MAX_ENTITIES, context);
+        quad_texture_render(app_data->rt_data.image, context);
+        //raster_pipeline_render(app_data->meshes[0], MAX_ENTITIES, context);
         gui_render(app_data->gui_context, context);
         debug_pipeline_render(context);
     dm_render_command_end_render_pass(context);

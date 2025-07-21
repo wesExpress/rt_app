@@ -133,7 +133,7 @@ void main()
         vertices[2].normal_v.xyz
     };
 
-    vec2 tex_coords[3] = {
+    const vec2 tex_coords[3] = {
         { vertices[0].position_u.w, vertices[0].normal_v.w },
         { vertices[1].position_u.w, vertices[1].normal_v.w },
         { vertices[2].position_u.w, vertices[2].normal_v.w }
@@ -157,5 +157,5 @@ void main()
     vec3 normal = normalize(cross(ab, ac));
 #endif
 
-    p.color.rgb = texture(sampler2D(textures[m.diffuse_texture_index], samplers[m.sampler_index]), uv).rgb;
+    p.color= texture(sampler2D(textures[m.diffuse_texture_index], samplers[m.sampler_index]), uv);
 }

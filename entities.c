@@ -46,7 +46,7 @@ bool init_entities(dm_context* context)
 
     for(uint32_t i=0; i<MAX_ENTITIES; i++)
     {
-        app_data->entities.transforms[i] = init_transform(50.f, context);
+        app_data->entities.transforms[i] = init_transform(150.f, context);
         app_data->entities.phys[i]       = init_physics(context);
 
         app_data->entities.materials[i].vb_index = app_data->meshes[0].vb.descriptor_index;
