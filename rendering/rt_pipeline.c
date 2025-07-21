@@ -61,6 +61,8 @@ bool rt_pipeline_init(dm_context* context)
             desc.vertex_count  = app_data->meshes[i].vertex_count;
             desc.vertex_buffer = app_data->meshes[i].vb;
             desc.vertex_stride = app_data->meshes[i].vertex_stride;
+            desc.index_type    = app_data->meshes[i].index_type;
+            desc.index_count   = app_data->meshes[i].index_count;
 
             if(!dm_renderer_create_blas(desc, &app_data->rt_data.blas[i], context)) return false;
         }
@@ -74,7 +76,6 @@ bool rt_pipeline_init(dm_context* context)
         }
 
         dm_storage_buffer_desc desc = { 0 };
-        desc.write  = false;
         desc.size   = sizeof(size_t) * 10;
         desc.stride = sizeof(size_t);
         desc.data   = app_data->rt_data.blas_addresses;
@@ -84,6 +85,7 @@ bool rt_pipeline_init(dm_context* context)
 
     // === fill in and create rt instance buffer ===
     {
+        #if 0
         for(uint32_t i=0; i<MAX_ENTITIES; i++)
         {
             app_data->entities.rt_instances[i].id = i;
@@ -99,9 +101,9 @@ bool rt_pipeline_init(dm_context* context)
             app_data->entities.rt_instances[i].transform[1][3] = dm_random_float(context) * 50.f - 25.f;
             app_data->entities.rt_instances[i].transform[2][3] = dm_random_float(context) * 50.f - 25.f;
         }
+        #endif
         
         dm_storage_buffer_desc desc = { 0 };
-        desc.write  = true;
         desc.size   = MAX_ENTITIES * sizeof(dm_raytracing_instance);
         desc.stride = sizeof(dm_raytracing_instance);
         desc.data   = app_data->entities.rt_instances;
@@ -131,6 +133,10 @@ bool rt_pipeline_init(dm_context* context)
 
         if(!dm_renderer_create_constant_buffer(desc, &app_data->rt_data.camera_cb, context)) return false;
     }
+
+    //
+    app_data->rt_data.image_width  = context->renderer.width;
+    app_data->rt_data.image_height = context->renderer.height;
 
     return true;
 }
@@ -167,10 +173,18 @@ bool rt_pipeline_update(dm_context* context)
 
     dm_render_command_update_tlas(MAX_ENTITIES, app_data->rt_data.tlas, context);
 
+    if(app_data->rt_data.image_width != context->renderer.width || app_data->rt_data.image_height != context->renderer.height)
+    {
+        app_data->rt_data.image_width  = context->renderer.width;
+        app_data->rt_data.image_height = context->renderer.height;
+
+        dm_render_command_resize_texture(context->renderer.width, context->renderer.height, app_data->rt_data.image, context);
+    }
+
     return true;
 }
 
-bool rt_pipeline_render(dm_context* context)
+void rt_pipeline_render(dm_context* context)
 {
     application_data* app_data = context->app_data;
 
@@ -181,17 +195,9 @@ bool rt_pipeline_render(dm_context* context)
     app_data->rt_data.resources.scene_data_index       = app_data->rt_data.scene_cb.descriptor_index;
     app_data->rt_data.resources.material_buffer        = app_data->entities.material_sb.descriptor_index;
 
-    if(app_data->rt_data.resized) 
-    {
-        dm_render_command_resize_texture(context->renderer.width, context->renderer.height, app_data->rt_data.image, context);
-        app_data->rt_data.resized = false;
-    }
-
     // render
     dm_render_command_bind_raytracing_pipeline(app_data->rt_data.pipeline, context);
     dm_render_command_set_root_constants(0,5,0, &app_data->rt_data.resources, context);
     dm_render_command_dispatch_rays(context->renderer.width, context->renderer.height, app_data->rt_data.pipeline, context);
-
-    return true;
 }
 

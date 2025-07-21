@@ -16,9 +16,8 @@ struct scene_data
 
 struct vertex
 {
-    float4 position;
-    float4 normal;
-    float4 color;
+    float4 position_u;
+    float4 normal_v;
 };
 
 struct instance
@@ -31,7 +30,8 @@ struct material
     uint vb_index;
     uint ib_index;
     uint is_indexed;
-    uint padding;
+    uint diffuse_texture_index;
+    uint sampler_index;
 };
 
 struct render_resources
@@ -105,7 +105,14 @@ inline float3 get_barycentrics(BuiltInTriangleIntersectionAttributes attrs)
     );
 }
 
-inline float3 interpolate_value(float3 input[3], float3 barycentrics)
+inline float3 interpolate_float3(float3 input[3], float3 barycentrics)
+{
+    return input[0] * barycentrics.x +
+           input[1] * barycentrics.y +
+           input[2] * barycentrics.z;
+}
+
+inline float2 interpolate_float2(float2 input[3], float3 barycentrics)
 {
     return input[0] * barycentrics.x +
            input[1] * barycentrics.y +
@@ -149,9 +156,11 @@ void closest_hit(inout ray_payload p, BuiltInTriangleIntersectionAttributes attr
     const uint inst_index = InstanceIndex();
 
     StructuredBuffer<material> material_buffer = ResourceDescriptorHeap[resources.material_buffer];
-
     material m = material_buffer[inst_index];
-    
+
+    Texture2D diffuse_texture = ResourceDescriptorHeap[m.diffuse_texture_index];
+    SamplerState sampler = SamplerDescriptorHeap[m.sampler_index];
+
     vertex vertices[3];
 
     if(m.is_indexed==0) get_vertices(m, vertices);
@@ -160,26 +169,21 @@ void closest_hit(inout ray_payload p, BuiltInTriangleIntersectionAttributes attr
     float3 barycentrics = get_barycentrics(attrs);
 
     const float3 positions[3] = {
-        vertices[0].position.xyz,
-        vertices[1].position.xyz,
-        vertices[2].position.xyz
+        vertices[0].position_u.xyz,
+        vertices[1].position_u.xyz,
+        vertices[2].position_u.xyz
     };
 
-    const float3 normals[3] = {
-        vertices[0].normal.xyz,
-        vertices[1].normal.xyz,
-        vertices[2].normal.xyz
+    const float2 tex_coords[3] = {
+        { vertices[0].position_u.w, vertices[0].normal_v.w },
+        { vertices[1].position_u.w, vertices[1].normal_v.w },
+        { vertices[2].position_u.w, vertices[2].normal_v.w }
     };
 
-    const float3 colors[3] = {
-        vertices[0].color.rgb,
-        vertices[1].color.rgb,
-        vertices[2].color.rgb
-    };
+    float2 uv = interpolate_float2(tex_coords, barycentrics);
 
-    float3 position = interpolate_value(positions, barycentrics);
-    float3 color    = interpolate_value(colors, barycentrics);
-
+#if 0
+    float3 position = interpolate_float3(positions, barycentrics);
     position = mul(float4(position, 1), ObjectToWorld4x3()).xyz;
 
     float3 a = mul(float4(positions[0], 1), ObjectToWorld4x3()).xyz;
@@ -190,7 +194,10 @@ void closest_hit(inout ray_payload p, BuiltInTriangleIntersectionAttributes attr
     float3 ac = c - a;
 
     float3 normal = normalize(cross(ab, ac));
+#endif
 
-    p.color.rgb = color * dot(light - position, normal);
+    //p.color.rgb = diffuse_texture.Load(int3(coords, 0)).rgb;
+    //p.color.rgb = diffuse_texture.Sample(sampler, uv).rgb;
+    p.color.rgb = diffuse_texture.SampleGrad(sampler, uv, 0,0).rgb;
 }
 

@@ -9,6 +9,7 @@ struct FRAGMENT_OUT
 {
     float4 pos        : SV_POSITION;
     float2 tex_coords : TEX_COORDS1;
+    uint instance_index : INST;
 };
 
 struct scene_data
@@ -19,8 +20,7 @@ struct scene_data
 struct render_resources 
 {
     uint scene_cb;
-    uint sampler_index;
-    uint diffuse_texture_index;
+    uint material_buffer_index;
 };
 
 ConstantBuffer<render_resources> resources : register(b0);
@@ -35,6 +35,8 @@ FRAGMENT_OUT main(VERTEX_IN v_in, uint inst_id : SV_InstanceID)
     frag_out.pos = mul(frag_out.pos, scene_buffer.view_proj);
 
     frag_out.tex_coords = float2(v_in.position_u.w, v_in.normal_v.w);
+
+    frag_out.instance_index = inst_id;
 
     return frag_out;
 }

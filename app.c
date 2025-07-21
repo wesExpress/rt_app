@@ -176,7 +176,7 @@ bool dm_application_render(dm_context* context)
     application_data* app_data = context->app_data;
 
     // raytracing has to happen outside of a render pass
-    //rt_pipeline_render(context);
+    rt_pipeline_render(context);
 
     // render after
     dm_render_command_begin_render_pass(0,0,0,1.f, context);

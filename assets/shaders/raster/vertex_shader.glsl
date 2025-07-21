@@ -7,6 +7,7 @@ layout(location = 1) in vec4 vertex_normal_v;
 layout(location = 2) in mat4 model;
 
 layout(location = 0) out vec2 fragment_tex_coords;
+layout(location = 1) out flat int instance_index;
 
 struct instance
 {
@@ -23,8 +24,7 @@ layout(std140, set=0, binding=0) uniform u0 { camera_data data; } uniform_buffer
 layout(push_constant) uniform render_resources 
 {
     uint camera_data_index;
-    uint sampler_index;
-    uint diffuse_texture_index;
+    uint material_buffer_index;
 };
 
 void main()
@@ -34,5 +34,7 @@ void main()
     gl_Position = view_projection * model * vec4(vertex_position_u.xyz, 1);
 
     fragment_tex_coords = vec2(vertex_position_u.w, vertex_normal_v.w);
+
+    instance_index = gl_InstanceIndex;
 }
 

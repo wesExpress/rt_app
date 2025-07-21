@@ -12,8 +12,7 @@ typedef struct raster_inst_t
 typedef struct render_resources_t
 {
     uint32_t scene_cb;
-    uint32_t sampler_index;
-    uint32_t diffuse_texture_index;
+    uint32_t material_buffer_index;
 } render_resources;
 
 typedef struct raster_scene_data_t

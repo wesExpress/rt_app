@@ -18,6 +18,7 @@ typedef struct material_t
     uint32_t ib_index;
     uint32_t is_indexed;
     uint32_t diffuse_texture_index;
+    uint32_t sampler_index;
 } material;
 
 typedef struct physics_t

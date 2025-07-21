@@ -112,11 +112,10 @@ void raster_pipeline_render(dm_mesh mesh, uint32_t count, dm_context* context)
     application_data* app_data = context->app_data;
 
     app_data->raster_data.render_data.scene_cb              = app_data->raster_data.cb.descriptor_index;
-    app_data->raster_data.render_data.sampler_index         = mesh.sampler.descriptor_index;
-    app_data->raster_data.render_data.diffuse_texture_index = mesh.diffuse_texture.descriptor_index + 1;
+    app_data->raster_data.render_data.material_buffer_index = app_data->entities.material_sb.descriptor_index;
 
     dm_render_command_bind_raster_pipeline(app_data->raster_data.pipeline, context);
-    dm_render_command_set_root_constants(0,3,0, &app_data->raster_data.render_data, context);
+    dm_render_command_set_root_constants(0,4,0, &app_data->raster_data.render_data, context);
     dm_render_command_bind_vertex_buffer(mesh.vb, 0, context);
     dm_render_command_bind_vertex_buffer(app_data->raster_data.inst_vb, 1, context);
 
