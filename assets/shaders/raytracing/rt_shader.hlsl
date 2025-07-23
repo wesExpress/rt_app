@@ -18,6 +18,8 @@ struct vertex
 {
     float4 position_u;
     float4 normal_v;
+    float4 tangent;
+    float4 color;
 };
 
 struct instance
@@ -30,10 +32,9 @@ struct material
     uint vb_index;
     uint ib_index;
     uint is_indexed;
-    uint diffuse_texture_index;
-    uint normal_map_index;
+    uint material_indices[3];
     uint sampler_index;
-    uint padding[2];
+    uint padding;
 };
 
 struct render_resources
@@ -139,17 +140,6 @@ inline void get_vertices_indexed(material m, inout vertex vertices[3])
     vertices[2] = vertex_buffer[indices[2]];
 }
 
-inline void get_vertices(material m, inout vertex vertices[3])
-{
-    const uint tri_index = PrimitiveIndex() * 3;
-
-    StructuredBuffer<vertex> vertex_buffer = ResourceDescriptorHeap[m.vb_index];
-    
-    vertices[0] = vertex_buffer[tri_index + 0];
-    vertices[1] = vertex_buffer[tri_index + 1];
-    vertices[2] = vertex_buffer[tri_index + 2];
-}
-
 [shader("closesthit")]
 void closest_hit(inout ray_payload p, BuiltInTriangleIntersectionAttributes attrs)
 {
@@ -160,13 +150,13 @@ void closest_hit(inout ray_payload p, BuiltInTriangleIntersectionAttributes attr
     StructuredBuffer<material> material_buffer = ResourceDescriptorHeap[resources.material_buffer];
     material m = material_buffer[inst_index];
 
-    Texture2D diffuse_texture = ResourceDescriptorHeap[m.diffuse_texture_index];
+    Texture2D diffuse_texture = ResourceDescriptorHeap[m.material_indices[0]];
+    Texture2D normal_map      = ResourceDescriptorHeap[m.material_indices[1]];
     SamplerState sampler = SamplerDescriptorHeap[m.sampler_index];
-
+    
     vertex vertices[3];
 
-    if(m.is_indexed==0) get_vertices(m, vertices);
-    else                get_vertices_indexed(m, vertices);
+    get_vertices_indexed(m, vertices);
 
     float3 barycentrics = get_barycentrics(attrs);
 
@@ -176,28 +166,46 @@ void closest_hit(inout ray_payload p, BuiltInTriangleIntersectionAttributes attr
         vertices[2].position_u.xyz
     };
 
+    const float3 normals[3] = {
+        vertices[0].normal_v.xyz,
+        vertices[1].normal_v.xyz,
+        vertices[2].normal_v.xyz
+    };
+
+    const float3 tangents[3] = {
+        vertices[0].tangent.xyz,
+        vertices[1].tangent.xyz,
+        vertices[2].tangent.xyz
+    };
+
     const float2 tex_coords[3] = {
         { vertices[0].position_u.w, vertices[0].normal_v.w },
         { vertices[1].position_u.w, vertices[1].normal_v.w },
         { vertices[2].position_u.w, vertices[2].normal_v.w }
     };
 
-    float2 uv = interpolate_float2(tex_coords, barycentrics);
-
-#if 0
     float3 position = interpolate_float3(positions, barycentrics);
+    float3 normal   = interpolate_float3(normals, barycentrics);
+    float3 tangent  = interpolate_float3(tangents, barycentrics);
+    float2 uv       = interpolate_float2(tex_coords, barycentrics);
+
     position = mul(float4(position, 1), ObjectToWorld4x3()).xyz;
 
-    float3 a = mul(float4(positions[0], 1), ObjectToWorld4x3()).xyz;
-    float3 b = mul(float4(positions[1], 1), ObjectToWorld4x3()).xyz;
-    float3 c = mul(float4(positions[2], 1), ObjectToWorld4x3()).xyz;
+    float3 T = normalize(mul(float4(tangent, 0), ObjectToWorld4x3()).xyz);
+    float3 N = normalize(mul(float4(normal, 0), ObjectToWorld4x3()).xyz);
+    float3 B = cross(N,T);
 
-    float3 ab = b - a;
-    float3 ac = c - a;
+    float3x3 TBN = float3x3(T,B,N);
 
-    float3 normal = normalize(cross(ab, ac));
-#endif
+    float3 diffuse_color = diffuse_texture.SampleGrad(sampler, uv, 0,0).rgb;
 
-    p.color = diffuse_texture.SampleGrad(sampler, uv, 0,0);
+    normal = normal_map.SampleGrad(sampler, uv, 0,0).rgb;
+    normal = normalize(normal * 2 - 1);
+    normal = normalize(mul(normal, TBN));
+
+    float3 dir = normalize(light - position);
+    float diff = max(dot(normal, dir), 0);
+
+    p.color.rgb = diffuse_color * diff;
 }
 

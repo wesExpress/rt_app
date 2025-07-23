@@ -5,6 +5,8 @@ typedef struct raster_vertex_t
 {
     dm_vec4 position;
     dm_vec4 normal;
+    dm_vec4 tangent;
+    dm_vec4 color;
 } raster_vertex;
 
 bool raster_pipeline_init(dm_context* context)
@@ -17,7 +19,6 @@ bool raster_pipeline_init(dm_context* context)
         desc.stride = sizeof(raster_inst);
         desc.size   = sizeof(app_data->raster_data.instances);
         desc.data   = NULL;
-        desc.element_size = sizeof(float);
 
         if(!dm_renderer_create_vertex_buffer(desc, &app_data->raster_data.inst_vb, context)) return false;
     }
@@ -50,6 +51,22 @@ bool raster_pipeline_init(dm_context* context)
             .offset=offsetof(raster_vertex, normal)
         };
 
+        dm_input_element_desc tangent_element = {
+            .name="TANGENT",
+            .format=DM_INPUT_ELEMENT_FORMAT_FLOAT_4,
+            .class=DM_INPUT_ELEMENT_CLASS_PER_VERTEX,
+            .stride=sizeof(raster_vertex),
+            .offset=offsetof(raster_vertex, tangent)
+        };
+
+        dm_input_element_desc color_element = {
+            .name="COLOR",
+            .format=DM_INPUT_ELEMENT_FORMAT_FLOAT_4,
+            .class=DM_INPUT_ELEMENT_CLASS_PER_VERTEX,
+            .stride=sizeof(raster_vertex),
+            .offset=offsetof(raster_vertex, color)
+        };
+
         dm_input_element_desc model_element = {
             .name="MODEL",
             .format=DM_INPUT_ELEMENT_FORMAT_MATRIX_4x4,
@@ -59,7 +76,7 @@ bool raster_pipeline_init(dm_context* context)
         };
 
         dm_raster_input_assembler_desc input_assembler = {
-            .input_elements = { pos_element,normal_element,model_element }, .input_element_count=3,
+            .input_elements = { pos_element,normal_element,tangent_element,color_element,model_element }, .input_element_count=5,
             .topology=DM_INPUT_TOPOLOGY_TRIANGLE_LIST
         };
 

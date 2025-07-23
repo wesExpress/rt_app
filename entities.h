@@ -17,10 +17,9 @@ typedef struct material_t
     uint32_t vb_index;
     uint32_t ib_index;
     uint32_t is_indexed;
-    uint32_t diffuse_texture_index;
-    uint32_t normal_map_index;
+    uint32_t material_indices[DM_MESH_MATERIAL_UNKNOWN];
     uint32_t sampler_index;
-    uint32_t padding[2];
+    uint32_t padding;
 } material;
 
 typedef struct physics_t

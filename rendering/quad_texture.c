@@ -27,7 +27,7 @@ bool quad_texture_init(dm_context* context)
     {
         dm_vertex_buffer_desc desc = { 
             .size=sizeof(vertices), .data=vertices,
-            .element_size=sizeof(float), .stride=sizeof(quad_vertex)
+            .stride=sizeof(quad_vertex)
         };
 
         if(!dm_renderer_create_vertex_buffer(desc, &app_data->quad_texture_data.vb, context)) return false;
@@ -37,7 +37,7 @@ bool quad_texture_init(dm_context* context)
     {
         dm_index_buffer_desc desc = { 
             .size=sizeof(indices), .data=indices,
-            .index_type=DM_INDEX_BUFFER_INDEX_TYPE_UINT32, .element_size=sizeof(uint32_t)
+            .index_type=DM_INDEX_BUFFER_INDEX_TYPE_UINT32
         };
 
         if(!dm_renderer_create_index_buffer(desc, &app_data->quad_texture_data.ib, context)) return false;

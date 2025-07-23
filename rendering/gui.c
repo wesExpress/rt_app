@@ -66,7 +66,6 @@ bool gui_init(gui_style style, uint8_t font_count, void** gui_ctxt, dm_context* 
     {
         dm_vertex_buffer_desc vb_desc = { 0 };
         vb_desc.stride       = sizeof(gui_text_vertex);
-        vb_desc.element_size = sizeof(float);
         vb_desc.size         = sizeof(gui_text_vertex) * MAX_GUI_VERTICES;
         vb_desc.data         = NULL;
         for(uint8_t i=0; i<font_count; i++)

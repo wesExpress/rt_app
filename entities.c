@@ -12,7 +12,8 @@ transform init_transform(float world_scale, dm_context* context)
     t.position[1] = dm_random_float(context) * world_scale - world_scale * 0.5f;
     t.position[2] = dm_random_float(context) * world_scale - world_scale * 0.5f;
 
-    float scaling = dm_random_float(context);
+    //float scaling = dm_random_float(context) * 30.f;
+    float scaling = 1.f;
     t.scale[0] = scaling;
     t.scale[1] = scaling;
     t.scale[2] = scaling;
@@ -46,7 +47,7 @@ bool init_entities(dm_context* context)
 
     for(uint32_t i=0; i<MAX_ENTITIES; i++)
     {
-        app_data->entities.transforms[i] = init_transform(150.f, context);
+        app_data->entities.transforms[i] = init_transform(75.f, context);
         app_data->entities.phys[i]       = init_physics(context);
 
         app_data->entities.materials[i].vb_index = app_data->meshes[0].vb.descriptor_index;
@@ -141,8 +142,9 @@ void update_entities(dm_context* context)
         app_data->entities.materials[i].vb_index   = app_data->meshes[mesh_index].vb.descriptor_index;
         app_data->entities.materials[i].ib_index   = app_data->meshes[mesh_index].ib.descriptor_index;
         app_data->entities.materials[i].is_indexed = app_data->meshes[mesh_index].index_type==DM_INDEX_BUFFER_INDEX_TYPE_UNKNOWN ? 0 : 1;
-        app_data->entities.materials[i].diffuse_texture_index = app_data->meshes[mesh_index].diffuse_texture.descriptor_index+1;
-        app_data->entities.materials[i].normal_map_index = app_data->meshes[mesh_index].normal_map.descriptor_index+1;
+        app_data->entities.materials[i].material_indices[DM_MESH_MATERIAL_DIFFUSE] = app_data->meshes[mesh_index].materials[DM_MESH_MATERIAL_DIFFUSE].descriptor_index+1;
+        app_data->entities.materials[i].material_indices[DM_MESH_MATERIAL_NORMAL_MAP] = app_data->meshes[mesh_index].materials[DM_MESH_MATERIAL_NORMAL_MAP].descriptor_index+1;
+        app_data->entities.materials[i].material_indices[DM_MESH_MATERIAL_SPECULAR_MAP] = app_data->meshes[mesh_index].materials[DM_MESH_MATERIAL_SPECULAR_MAP].descriptor_index+1;
         app_data->entities.materials[i].sampler_index = app_data->meshes[mesh_index].sampler.descriptor_index;
     }
 

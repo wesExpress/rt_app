@@ -14,16 +14,17 @@ struct material
     uint vb_index;
     uint ib_index;
     uint is_indexed;
-    uint diffuse_texture_index;
-    uint normal_map_index;
+    uint material_indices[3];
     uint sampler_index;
-    uint padding[2];
+    uint padding;
 };
 
 struct vertex
 {
     vec4 position_u;
     vec4 normal_v;
+    vec4 tangent;
+    vec4 color;
 };
 
 layout(push_constant) uniform render_resources
@@ -47,23 +48,6 @@ layout(set=1, binding=0) uniform sampler samplers[SAMPLER_HEAP_SIZE];
 layout(location=0) rayPayloadInEXT payload p;
 hitAttributeEXT vec2 attribs;
 
-#if 0
-inline float3 get_barycentrics(BuiltInTriangleIntersectionAttributes attrs)
-{
-    return float3(
-        1 - attrs.barycentrics.x - attrs.barycentrics.y,
-        attrs.barycentrics.x,
-        attrs.barycentrics.y
-    );
-}
-
-inline float3 interpolate_value(float3 input[3], float3 barycentrics)
-{
-    return input[0] * barycentrics.x +
-           input[1] * barycentrics.y +
-           input[2] * barycentrics.z;
-}
-#endif
 vec3 get_barycentrics(vec2 attribs)
 {
     return vec3(
@@ -85,15 +69,6 @@ vec2 interpolate_vec2(vec2 values[3], vec3 barycentrics)
     return values[0] * barycentrics.x +
            values[1] * barycentrics.y +
            values[2] * barycentrics.z;
-}
-
-void get_vertices(material m, inout vertex vertices[3])
-{
-    uint tri_index = gl_PrimitiveID * 3;
-
-    vertices[0] = vertex_buffers[m.vb_index].data[tri_index + 0];
-    vertices[1] = vertex_buffers[m.vb_index].data[tri_index + 1];
-    vertices[2] = vertex_buffers[m.vb_index].data[tri_index + 2];
 }
 
 void get_vertices_indexed(material m, inout vertex vertices[3])
@@ -135,6 +110,12 @@ void main()
         vertices[2].normal_v.xyz
     };
 
+    vec3 tangents[3] = {
+        vertices[0].tangent.xyz,
+        vertices[1].tangent.xyz,
+        vertices[2].tangent.xyz,
+    };
+
     const vec2 tex_coords[3] = {
         { vertices[0].position_u.w, vertices[0].normal_v.w },
         { vertices[1].position_u.w, vertices[1].normal_v.w },
@@ -143,21 +124,28 @@ void main()
 
     vec3 barycentrics = get_barycentrics(attribs);
 
+    vec3 position = interpolate_vec3(positions, barycentrics);
+    vec3 normal   = interpolate_vec3(normals, barycentrics);
+    vec3 tangent  = interpolate_vec3(tangents, barycentrics);
     vec2 uv = interpolate_vec2(tex_coords, barycentrics);
 
-#if 0
-    vec3 position = interpolate_vec3(positions, barycentrics);
     position = (gl_ObjectToWorldEXT * vec4(position, 1)).xyz;
 
-    vec3 a = (gl_ObjectToWorldEXT * vec4(positions[0], 1)).xyz;
-    vec3 b = (gl_ObjectToWorldEXT * vec4(positions[1], 1)).xyz;
-    vec3 c = (gl_ObjectToWorldEXT * vec4(positions[2], 1)).xyz;
+    vec3 T = normalize((gl_ObjectToWorldEXT * vec4(position, 0)).xyz);
+    vec3 N = normalize((gl_ObjectToWorldEXT * vec4(normal, 0)).xyz);
+    vec3 B = normalize(cross(N,T));
 
-    vec3 ab = b - a;
-    vec3 ac = c - a;
+    mat3 TBN = mat3(T,B,N);
 
-    vec3 normal = normalize(cross(ab, ac));
-#endif
+    vec3 diffuse_color = texture(sampler2D(textures[m.material_indices[0]], samplers[m.sampler_index]), uv).rgb; 
 
-    p.color= texture(sampler2D(textures[m.diffuse_texture_index], samplers[m.sampler_index]), uv);
+    normal = texture(sampler2D(textures[m.material_indices[1]], samplers[m.sampler_index]), uv).rgb;
+    normal = normalize(normal * 2 - 1);
+    normal = normalize(normal * TBN);
+
+    vec3 dir = normalize(light - position);
+    float diff = max(dot(normal, dir), 0);
+
+    p.color.rgb = diffuse_color * diff;
+    //p.color.rgb = position;
 }

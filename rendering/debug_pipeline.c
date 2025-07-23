@@ -9,7 +9,6 @@ bool debug_pipeline_init(dm_context* context)
     {
         dm_vertex_buffer_desc desc = { 0 };
         desc.size         = sizeof(app_data->debug_data.vertices);
-        desc.element_size = sizeof(debug_vertex);
         desc.stride       = sizeof(debug_vertex);
         //desc.data         = (void*)app_data->debug_data.vertices;
 
@@ -20,7 +19,6 @@ bool debug_pipeline_init(dm_context* context)
     {
         dm_index_buffer_desc desc = { 0 };
         desc.size         = sizeof(app_data->debug_data.indices);
-        desc.element_size = sizeof(uint32_t);
         desc.data         = NULL;
         desc.index_type   = DM_INDEX_BUFFER_INDEX_TYPE_UINT32;
 
