@@ -49,9 +49,6 @@ bool init_entities(dm_context* context)
     {
         app_data->entities.transforms[i] = init_transform(75.f, context);
         app_data->entities.phys[i]       = init_physics(context);
-
-        app_data->entities.materials[i].vb_index = app_data->meshes[0].vb.descriptor_index;
-        app_data->entities.materials[i].ib_index = app_data->meshes[0].ib.descriptor_index;
     }
 
     return true;
@@ -81,14 +78,14 @@ bool init_entity_pipeline(dm_context* context)
         if(!dm_renderer_create_storage_buffer(b_desc, &app_data->entities.physics_sb, context)) return false;
     }
 
-    // === material buffer ===
+    // === mesh buffer ===
     {
         dm_storage_buffer_desc desc = { 0 };
-        desc.size = sizeof(material) * MAX_ENTITIES;
-        desc.stride = sizeof(material);
-        desc.data = app_data->entities.materials;
+        desc.size = sizeof(mesh) * MAX_ENTITIES;
+        desc.stride = sizeof(mesh);
+        desc.data = app_data->entities.meshes;
 
-        if(!dm_renderer_create_storage_buffer(desc, &app_data->entities.material_sb, context)) return false;
+        if(!dm_renderer_create_storage_buffer(desc, &app_data->entities.mesh_sb, context)) return false;
     }
 
     return true;
@@ -134,22 +131,19 @@ void update_entities(dm_context* context)
 #endif
 
         uint8_t mesh_index = 0;
+        uint8_t material_index = 0;
 
         app_data->entities.rt_instances[i].blas_address = app_data->rt_data.blas_addresses[mesh_index];
         app_data->entities.rt_instances[i].mask         = 0xFF;
         app_data->entities.rt_instances[i].id           = i;
 
-        app_data->entities.materials[i].vb_index   = app_data->meshes[mesh_index].vb.descriptor_index;
-        app_data->entities.materials[i].ib_index   = app_data->meshes[mesh_index].ib.descriptor_index;
-        app_data->entities.materials[i].is_indexed = app_data->meshes[mesh_index].index_type==DM_INDEX_BUFFER_INDEX_TYPE_UNKNOWN ? 0 : 1;
-        app_data->entities.materials[i].material_indices[DM_MESH_MATERIAL_DIFFUSE] = app_data->meshes[mesh_index].materials[DM_MESH_MATERIAL_DIFFUSE].descriptor_index+1;
-        app_data->entities.materials[i].material_indices[DM_MESH_MATERIAL_NORMAL_MAP] = app_data->meshes[mesh_index].materials[DM_MESH_MATERIAL_NORMAL_MAP].descriptor_index+1;
-        app_data->entities.materials[i].material_indices[DM_MESH_MATERIAL_SPECULAR_MAP] = app_data->meshes[mesh_index].materials[DM_MESH_MATERIAL_SPECULAR_MAP].descriptor_index+1;
-        app_data->entities.materials[i].sampler_index = app_data->meshes[mesh_index].sampler.descriptor_index;
+        app_data->entities.meshes[i].vb_index       = app_data->meshes[mesh_index].vb.descriptor_index;
+        app_data->entities.meshes[i].ib_index       = app_data->meshes[mesh_index].ib.descriptor_index;
+        app_data->entities.meshes[i].material_index = material_index;
     }
 
     dm_render_command_update_storage_buffer(app_data->entities.rt_instances, sizeof(app_data->entities.rt_instances), app_data->entities.rt_instance_sb, context);
-    dm_render_command_update_storage_buffer(app_data->entities.materials, sizeof(app_data->entities.materials), app_data->entities.material_sb, context);
+    dm_render_command_update_storage_buffer(app_data->entities.meshes, sizeof(app_data->entities.meshes), app_data->entities.mesh_sb, context);
     dm_render_command_update_vertex_buffer(app_data->raster_data.instances, sizeof(app_data->raster_data.instances), app_data->raster_data.inst_vb, context);
 }
 

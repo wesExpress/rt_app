@@ -12,40 +12,26 @@ typedef struct transform_t
     dm_quat orientation;
 } transform;
 
-typedef struct material_t
-{
-    uint32_t vb_index;
-    uint32_t ib_index;
-    uint32_t is_indexed;
-    uint32_t material_indices[DM_MESH_MATERIAL_UNKNOWN];
-    uint32_t sampler_index;
-    uint32_t padding;
-} material;
-
 typedef struct physics_t
 {
     dm_vec4 w;
 } physics;
 
-typedef struct compute_resources_t 
+typedef struct mesh_t
 {
-    uint32_t transform_buffer;
-    uint32_t physics_buffer;
-    uint32_t instance_buffer;
-    uint32_t rt_instance_buffer;
-    uint32_t blas_buffer;
-} compute_resources;
+    uint32_t vb_index, ib_index;
+    uint32_t material_index;
+    uint32_t padding;
+} mesh;
 
 typedef struct entity_data
 {
-    transform transforms[MAX_ENTITIES];
+    transform              transforms[MAX_ENTITIES];
     dm_raytracing_instance rt_instances[MAX_ENTITIES];
-    physics   phys[MAX_ENTITIES];
-    material  materials[MAX_ENTITIES];
+    physics                phys[MAX_ENTITIES];
+    mesh                   meshes[MAX_ENTITIES];
 
-    dm_resource_handle transform_sb, instance_sb, rt_instance_sb, physics_sb, material_sb;
-
-    compute_resources resources;
+    dm_resource_handle transform_sb, rt_instance_sb, physics_sb, mesh_sb;
 } entity_data;
 
 bool init_entities(dm_context* context);

@@ -2,20 +2,39 @@
 #extension GL_EXT_ray_tracing : require
 #extension GL_ARB_shading_language_include : enable
 
+#define float3 vec3
+#include "..\lighting.h"
 #include "..\shader_include.h"
 
 struct payload
 {
     vec4 color;
+    uint bounce_count;
 };
 
 struct material
 {
-    uint vb_index;
-    uint ib_index;
-    uint is_indexed;
-    uint material_indices[3];
-    uint sampler_index;
+    uint diffuse_texture_index;
+    uint metallic_texture_index;
+    uint normal_map_index;
+    uint specular_map_index;
+    uint occlusion_map_index;
+    uint emissive_map_index;
+
+    uint diffuse_sampler_index;
+    uint metallic_sampler_index;
+    uint normal_sampler_index;
+    uint specular_sampler_index;
+    uint occlusion_sampler_index;
+    uint emissive_sampler_index;
+
+    uint padding[2];
+};
+
+struct mesh_data
+{
+    uint vb_index, ib_index;
+    uint material_index;
     uint padding;
 };
 
@@ -30,17 +49,19 @@ struct vertex
 layout(push_constant) uniform render_resources
 {
     uint acceleration_structure_index;
-    uint image_index;
+    uint image_index, random_image_index;
     uint camera_data_index;
     uint scene_data_index;
     uint material_buffer_index;
+    uint mesh_buffer_index;
 };
 
 layout(set=0, binding=0) uniform accelerationStructureEXT acceleration_structures[RESOURCE_HEAP_SIZE];
 
-layout(set=0, binding=0) buffer b0 { material data[]; } material_buffers[RESOURCE_HEAP_SIZE];
-layout(set=0, binding=0) buffer b1 { vertex data[]; }   vertex_buffers[RESOURCE_HEAP_SIZE];
-layout(set=0, binding=0) buffer b2 { uint data[]; }     index_buffers[RESOURCE_HEAP_SIZE];
+layout(set=0, binding=0) buffer b0 { mesh_data data[]; } mesh_buffers[RESOURCE_HEAP_SIZE];
+layout(set=0, binding=0) buffer b1 { material data[]; }  material_buffers[RESOURCE_HEAP_SIZE];
+layout(set=0, binding=0) buffer b2 { vertex data[]; }    vertex_buffers[RESOURCE_HEAP_SIZE];
+layout(set=0, binding=0) buffer b3 { uint data[]; }      index_buffers[RESOURCE_HEAP_SIZE];
 
 layout(set=0, binding=0) uniform texture2D textures[RESOURCE_HEAP_SIZE];
 layout(set=1, binding=0) uniform sampler samplers[SAMPLER_HEAP_SIZE];
@@ -71,7 +92,7 @@ vec2 interpolate_vec2(vec2 values[3], vec3 barycentrics)
            values[2] * barycentrics.z;
 }
 
-void get_vertices_indexed(material m, inout vertex vertices[3])
+void get_vertices_indexed(mesh_data m, inout vertex vertices[3])
 {
     uint tri_index = gl_PrimitiveID * 3;
 
@@ -92,11 +113,12 @@ void main()
 
     uint inst_index = gl_InstanceCustomIndexEXT;
 
-    material m = material_buffers[material_buffer_index].data[inst_index];
+    mesh_data mesh = mesh_buffers[mesh_buffer_index].data[inst_index];
+    material  mat  = material_buffers[material_buffer_index].data[mesh.material_index];
 
     vertex vertices[3];
 
-    get_vertices_indexed(m, vertices);
+    get_vertices_indexed(mesh, vertices);
 
     vec3 positions[3] = {
         vertices[0].position_u.xyz,
@@ -137,15 +159,24 @@ void main()
 
     mat3 TBN = mat3(T,B,N);
 
-    vec3 diffuse_color = texture(sampler2D(textures[m.material_indices[0]], samplers[m.sampler_index]), uv).rgb; 
+    vec3 diffuse_color      = texture(sampler2D(textures[mat.diffuse_texture_index],  samplers[mat.diffuse_sampler_index]),   uv).rgb; 
+    vec3 metallic_roughness = texture(sampler2D(textures[mat.metallic_texture_index], samplers[mat.metallic_sampler_index]),  uv).rgb;
+    vec3 normal_map_normal  = texture(sampler2D(textures[mat.normal_map_index],       samplers[mat.normal_sampler_index]),    uv).rgb;
+    vec3 occlusion          = texture(sampler2D(textures[mat.occlusion_map_index],    samplers[mat.occlusion_sampler_index]), uv).rgb;
+    vec3 emission           = texture(sampler2D(textures[mat.emissive_map_index],     samplers[mat.emissive_sampler_index]),  uv).rgb;
 
-    normal = texture(sampler2D(textures[m.material_indices[1]], samplers[m.sampler_index]), uv).rgb;
-    normal = normalize(normal * 2 - 1);
-    normal = normalize(normal * TBN);
+    float metallic  = metallic_roughness.b;
+    float roughness = metallic_roughness.g;
 
-    vec3 dir = normalize(light - position);
-    float diff = max(dot(normal, dir), 0);
+    normal = normalize(normal_map_normal * 2 - 1);
+    normal = normalize(TBN * normal);
 
-    p.color.rgb = diffuse_color * diff;
-    //p.color.rgb = position;
+    // lighting
+    vec3 light_pos = { 0,0,0 };
+    vec3 light_color = { 1,1,1 };
+    vec3 light_ambient = { 0,0,0 };
+
+    vec3 color = calculate_lighting(position, normal, light_pos, light_color, light_ambient, diffuse_color, gl_WorldRayOriginEXT, roughness, metallic);
+
+    p.color = vec4(light_ambient * occlusion + color + emission, 1);
 }

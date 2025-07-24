@@ -1,6 +1,16 @@
+#define SAMPLES_PER_PIXEL 1
+
+#include "../lighting.h"
+
 struct ray_payload
 {
     float4 color;
+    uint   bounce_count;
+};
+
+struct shadow_ray_payload
+{
+    uint miss;
 };
 
 struct camera_data
@@ -29,31 +39,54 @@ struct instance
 
 struct material
 {
-    uint vb_index;
-    uint ib_index;
-    uint is_indexed;
-    uint material_indices[3];
-    uint sampler_index;
+    uint diffuse_texture_index;
+    uint metallic_texture_index;
+    uint normal_map_index;
+    uint specular_map_index;
+    uint occlusion_map_index;
+    uint emissive_map_index;
+
+    uint diffuse_sampler_index;
+    uint metallic_sampler_index;
+    uint normal_sampler_index;
+    uint specular_sampler_index;
+    uint occlusion_sampler_index;
+    uint emissive_sampler_index;
+
+    uint padding[2];
+};
+
+struct mesh_data
+{
+    uint vb_index, ib_index;
+    uint material_index;
     uint padding;
 };
 
 struct render_resources
 {
     uint acceleration_structure;
-    uint image;
+    uint image, random_image;
     uint camera_data;
     uint scene_data;
-    uint material_buffer;
+    uint material_buffer_index;
+    uint mesh_buffer_index;
 };
 
 ConstantBuffer<render_resources> resources : register(b0);
 
-inline float3 get_direction(uint2 index, uint2 screen_dimensions, float3 origin, matrix inv_view, matrix inv_proj)
+inline float random_float(inout uint seed)
+{
+    seed = (1664525u * seed + 1013904223u);
+	return float(seed & 0x00FFFFFF) / float(0x01000000);
+}
+
+inline float3 get_direction(uint2 index, uint2 screen_dimensions, float3 origin, matrix inv_view, matrix inv_proj, inout uint seed)
 {
     const float  aspect_ratio = float(screen_dimensions.x) / float(screen_dimensions.y);
 
     // get screen position
-    const float2 ndc  = (float2(index) + 0.5f) / float2(screen_dimensions);
+    const float2 ndc  = (float2(index) + random_float(seed)) / float2(screen_dimensions);
     float2 screen_pos = ndc * 2.f - 1.f;
     screen_pos.y *= -1.f;
 
@@ -70,25 +103,37 @@ void ray_generation()
 {
     RaytracingAccelerationStructure scene = ResourceDescriptorHeap[resources.acceleration_structure];
     RWTexture2D<float4> image             = ResourceDescriptorHeap[resources.image];
+    RWTexture2D<uint> random_image        = ResourceDescriptorHeap[resources.random_image];
     ConstantBuffer<camera_data> camera_cb = ResourceDescriptorHeap[resources.camera_data];
     ConstantBuffer<scene_data> scene_cb   = ResourceDescriptorHeap[resources.scene_data];
 
-    ray_payload p;
-    p.color = float4(1,0,1,1);
-    
-    const uint2 launch_index = DispatchRaysIndex().xy;
+    const uint2 launch_index      = DispatchRaysIndex().xy;
     const uint2 screen_dimensions = DispatchRaysDimensions().xy;
-    const float3 origin      = camera_cb.origin.xyz;
+    const float3 origin           = camera_cb.origin.xyz;
 
-    RayDesc ray;
-    ray.Origin    = origin;
-    ray.Direction = get_direction(launch_index, screen_dimensions, origin, camera_cb.inv_view, camera_cb.inv_proj);
-    ray.TMin      = 0.001f;
-    ray.TMax      = 1000.f;
+    uint seed = random_image[launch_index];
 
-    TraceRay(scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, 0xFF, 0,1,0, ray, p);
+    float4 color = float4(0,0,0,1);
+    for(uint i=0; i<SAMPLES_PER_PIXEL; i++)
+    {
+        ray_payload p;
+        p.color = float4(1,0,1,1);
 
-    image[launch_index] = float4(p.color.rgb, 1.f);
+        RayDesc ray;
+        ray.Origin    = origin;
+        ray.Direction = get_direction(launch_index, screen_dimensions, origin, camera_cb.inv_view, camera_cb.inv_proj, seed);
+        ray.TMin      = 0.001f;
+        ray.TMax      = 1000.f;
+
+        TraceRay(scene, RAY_FLAG_NONE, 0xFF, 0,2,0, ray, p);
+
+        color += p.color;
+    }   
+
+    color.rgb /= (float)SAMPLES_PER_PIXEL;
+
+    image[launch_index] = color;
+    random_image[launch_index] = seed;
 }
 
 [shader("miss")]
@@ -122,7 +167,7 @@ inline float2 interpolate_float2(float2 input[3], float3 barycentrics)
            input[2] * barycentrics.z;
 }
 
-inline void get_vertices_indexed(material m, inout vertex vertices[3])
+inline void get_vertices_indexed(mesh_data m, inout vertex vertices[3])
 {
     const uint tri_index = PrimitiveIndex() * 3;
 
@@ -143,20 +188,32 @@ inline void get_vertices_indexed(material m, inout vertex vertices[3])
 [shader("closesthit")]
 void closest_hit(inout ray_payload p, BuiltInTriangleIntersectionAttributes attrs)
 {
-    const float3 light = { 0,0,0 };
-
     const uint inst_index = InstanceIndex();
 
-    StructuredBuffer<material> material_buffer = ResourceDescriptorHeap[resources.material_buffer];
-    material m = material_buffer[inst_index];
+    RaytracingAccelerationStructure scene = ResourceDescriptorHeap[resources.acceleration_structure];
 
-    Texture2D diffuse_texture = ResourceDescriptorHeap[m.material_indices[0]];
-    Texture2D normal_map      = ResourceDescriptorHeap[m.material_indices[1]];
-    SamplerState sampler = SamplerDescriptorHeap[m.sampler_index];
-    
+    StructuredBuffer<mesh_data> mesh_buffer    = ResourceDescriptorHeap[resources.mesh_buffer_index];
+    StructuredBuffer<material> material_buffer = ResourceDescriptorHeap[resources.material_buffer_index];
+
+    mesh_data mesh = mesh_buffer[inst_index];
+    material  mat  = material_buffer[mesh.material_index];
+
+    Texture2D    diffuse_texture = ResourceDescriptorHeap[mat.diffuse_texture_index];
+    Texture2D    metallic_map    = ResourceDescriptorHeap[mat.metallic_texture_index];
+    Texture2D    normal_map      = ResourceDescriptorHeap[mat.normal_map_index];
+    Texture2D    occlusion_map   = ResourceDescriptorHeap[mat.occlusion_map_index];
+    Texture2D    emissive_map    = ResourceDescriptorHeap[mat.emissive_map_index];
+
+    SamplerState diffuse_sampler   = SamplerDescriptorHeap[mat.diffuse_sampler_index];
+    SamplerState metallic_sampler  = SamplerDescriptorHeap[mat.metallic_sampler_index];
+    SamplerState normal_sampler    = SamplerDescriptorHeap[mat.normal_sampler_index];
+    SamplerState occlusion_sampler = SamplerDescriptorHeap[mat.occlusion_sampler_index];
+    SamplerState emissive_sampler  = SamplerDescriptorHeap[mat.emissive_sampler_index];
+
+    // vertex interpolation 
     vertex vertices[3];
 
-    get_vertices_indexed(m, vertices);
+    get_vertices_indexed(mesh, vertices);
 
     float3 barycentrics = get_barycentrics(attrs);
 
@@ -197,15 +254,40 @@ void closest_hit(inout ray_payload p, BuiltInTriangleIntersectionAttributes attr
 
     float3x3 TBN = float3x3(T,B,N);
 
-    float3 diffuse_color = diffuse_texture.SampleGrad(sampler, uv, 0,0).rgb;
-
-    normal = normal_map.SampleGrad(sampler, uv, 0,0).rgb;
+    normal = normal_map.SampleGrad(normal_sampler, uv, 0,0).rgb;
     normal = normalize(normal * 2 - 1);
     normal = normalize(mul(normal, TBN));
 
-    float3 dir = normalize(light - position);
-    float diff = max(dot(normal, dir), 0);
+    // pbr values
+    float3 diffuse_color      = diffuse_texture.SampleGrad(diffuse_sampler, uv, 0,0).rgb;
+    float3 metallic_roughness = metallic_map.SampleGrad(metallic_sampler, uv, 0,0).rgb;
+    float3 occlusion          = occlusion_map.SampleGrad(occlusion_sampler, uv, 0,0).rgb;
+    float3 emission           = emissive_map.SampleGrad(emissive_sampler, uv, 0,0).rgb;
 
-    p.color.rgb = diffuse_color * diff;
+    float metallic  = metallic_roughness.b;
+    float roughness = metallic_roughness.g;
+
+    // lighting
+    float3 light_pos     = float3(0,0,0);
+    float3 light_color   = float3(1,1,1);
+    float3 light_ambient = float3(0,0,0);
+
+    float3 color = calculate_lighting(position, normal, light_pos, light_color, light_ambient, diffuse_color, WorldRayOrigin(), roughness, metallic);
+
+    p.color.rgb = light_ambient * occlusion + color + emission;
 }
 
+/*******************
+* SHADOW HIT GROUP *
+********************/
+[shader("closesthit")]
+void shadow_closest_hit(inout shadow_ray_payload p, BuiltInTriangleIntersectionAttributes attrs)
+{
+    p.miss = 0;
+}
+
+[shader("miss")]
+void shadow_miss(inout shadow_ray_payload p)
+{
+    p.miss = 1;
+}

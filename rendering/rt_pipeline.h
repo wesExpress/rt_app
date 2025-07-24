@@ -2,7 +2,6 @@
 #define __RT_PIPELINE_H__
 
 #include "dm.h"
-#include "../entities.h"
 
 typedef struct scene_cb_t
 {
@@ -12,10 +11,11 @@ typedef struct scene_cb_t
 typedef struct rt_resources_t
 {
     uint32_t acceleration_structure;
-    uint32_t image;
+    uint32_t image, random_image;
     uint32_t camera_data_index;
     uint32_t scene_data_index;
-    uint32_t material_buffer;
+    uint32_t material_buffer_index;
+    uint32_t mesh_buffer_index;
 } rt_resources;
 
 typedef struct rt_camera_data_t
@@ -29,12 +29,10 @@ typedef struct rt_pipeline_data_t
     dm_resource_handle pipeline;
     dm_resource_handle tlas;
     dm_resource_handle scene_cb, camera_cb;
-    dm_resource_handle image;
-    dm_resource_handle blas_buffer;
+    dm_resource_handle image, random_image;
     dm_resource_handle blas[10];
 
     size_t blas_addresses[10];
-    material materials[MAX_ENTITIES];
 
     scene_cb scene_data;
     rt_camera_data camera_data;

@@ -7,6 +7,7 @@
 struct payload
 {
     vec4 color;
+    uint bounce_count;
 };
 
 struct camera_data
@@ -23,10 +24,11 @@ struct scene_data
 layout(push_constant) uniform render_resources
 {
     uint acceleration_structure_index;
-    uint image_index;
+    uint image_index, random_image_index;
     uint camera_data_index;
     uint scene_data_index;
     uint material_buffer_index;
+    uint mesh_buffer_index;
 };
 
 layout(set=0, binding=0) uniform u1 { scene_data data; }  scene_uniform[RESOURCE_HEAP_SIZE];

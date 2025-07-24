@@ -13,6 +13,7 @@ typedef struct render_resources_t
 {
     uint32_t scene_cb;
     uint32_t material_buffer_index;
+    uint32_t mesh_buffer_index;
 } render_resources;
 
 typedef struct raster_scene_data_t
