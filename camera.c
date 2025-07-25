@@ -40,6 +40,15 @@ void camera_update(simple_camera* camera, dm_context* context)
         move[0] = 1.f;
     }
 
+    if(dm_input_is_key_pressed(DM_KEY_E, context))
+    {
+        move[1] = 1.f;
+    }
+    else if(dm_input_is_key_pressed(DM_KEY_Q, context))
+    {
+        move[1] = -1.f;
+    }
+
 #define MOVE_SPEED 10.f
     dm_vec3_norm(move, move);
     dm_vec3_scale(move, MOVE_SPEED * context->delta, move);
