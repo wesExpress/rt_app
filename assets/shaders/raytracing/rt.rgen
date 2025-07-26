@@ -76,7 +76,8 @@ void main()
     uint seed = 0;
     vec3 direction = get_direction(inv_proj, inv_view, origin, launch_index, screen_dimensions, seed);
 
-    p.color = vec4(1,0,1,1);
+    p.color = vec4(0,0,0,1);
+    p.bounce_count = 0;
 
     traceRayEXT(acceleration_structures[acceleration_structure_index], 
         gl_RayFlagsOpaqueEXT, 

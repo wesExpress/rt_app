@@ -109,7 +109,6 @@ void get_vertices_indexed(mesh_data m, inout vertex vertices[3])
 
 void main()
 {
-    const vec3 light = vec3(0);
 
     uint inst_index = gl_InstanceCustomIndexEXT;
 
@@ -174,9 +173,26 @@ void main()
     // lighting
     vec3 light_pos = { 0,0,0 };
     vec3 light_color = { 1,1,1 };
-    vec3 light_ambient = { 0,0,0 };
+    vec3 light_ambient = { 0.1f,0.1f,0.1f };
+    light_ambient *= occlusion;
 
     vec3 color = calculate_lighting(position, normal, light_pos, light_color, light_ambient, diffuse_color, gl_WorldRayOriginEXT, roughness, metallic);
 
-    p.color = vec4(light_ambient * occlusion + color + emission, 1);
+    p.color += vec4(color + emission, 1);
+
+    if(p.bounce_count > 0)
+    {
+        p.bounce_count--;
+        traceRayEXT(acceleration_structures[acceleration_structure_index], 
+            gl_RayFlagsOpaqueEXT | gl_RayFlagsTerminateOnFirstHitEXT, 
+            0xFF, 
+            0,1,0, 
+            position, 
+            0.001, 
+            reflect(gl_WorldRayDirectionEXT, normalize(normal + roughness)), 
+            1000.0, 
+            0);
+
+    }
+    else p.bounce_count = 0;
 }

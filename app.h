@@ -8,6 +8,7 @@
 #include "rendering/rt_pipeline.h"
 #include "rendering/debug_pipeline.h"
 #include "rendering/quad_texture.h"
+#include "rendering/nuklear_gui.h"
 
 #include "camera.h"
 
@@ -40,6 +41,8 @@ typedef struct application_data_t
     rt_pipeline_data     rt_data;
     debug_pipeline_data  debug_data;
     quad_texture_data    quad_texture_data;
+    void* nuklear_data;
+    nuklear_context nk_context;
 
     dm_resource_handle default_sampler;
 

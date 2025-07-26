@@ -119,6 +119,7 @@ bool gui_init(gui_style style, uint8_t font_count, void** gui_ctxt, dm_context* 
         desc.rasterizer.cull_mode    = DM_RASTERIZER_CULL_MODE_BACK;
         desc.rasterizer.polygon_fill = DM_RASTERIZER_POLYGON_FILL_FILL;
         desc.rasterizer.front_face   = DM_RASTERIZER_FRONT_FACE_COUNTER_CLOCKWISE;
+
 #ifdef DM_DIRECTX12
         dm_strcpy(desc.rasterizer.vertex_shader_desc.path, "assets/shaders/quad_vertex.cso");
         dm_strcpy(desc.rasterizer.pixel_shader_desc.path,  "assets/shaders/quad_pixel.cso");
@@ -168,6 +169,7 @@ bool gui_init(gui_style style, uint8_t font_count, void** gui_ctxt, dm_context* 
         desc.rasterizer.cull_mode    = DM_RASTERIZER_CULL_MODE_BACK;
         desc.rasterizer.polygon_fill = DM_RASTERIZER_POLYGON_FILL_FILL;
         desc.rasterizer.front_face   = DM_RASTERIZER_FRONT_FACE_COUNTER_CLOCKWISE;
+
 #ifdef DM_DIRECTX12
         dm_strcpy(desc.rasterizer.vertex_shader_desc.path, "assets/shaders/gui_vertex.cso");
         dm_strcpy(desc.rasterizer.pixel_shader_desc.path,  "assets/shaders/gui_pixel.cso");
@@ -178,8 +180,6 @@ bool gui_init(gui_style style, uint8_t font_count, void** gui_ctxt, dm_context* 
 
         desc.viewport.type = DM_VIEWPORT_TYPE_DEFAULT;
         desc.scissor.type  = DM_SCISSOR_TYPE_DEFAULT;
-
-        desc.sampler = true;
 
         // depth stencil
         desc.depth_stencil.depth = false;
@@ -193,12 +193,12 @@ bool gui_init(gui_style style, uint8_t font_count, void** gui_ctxt, dm_context* 
     return true;
 }
 
-bool gui_load_font(const char* path, uint8_t font_size, uint8_t* font_index, void* gui_ctxt, dm_context* context)
+bool gui_load_font(dm_font_desc desc, uint8_t* font_index, void* gui_ctxt, dm_context* context)
 {
     gui_context* c = gui_ctxt;
     application_data* app_data = context->app_data;
 
-    if(!dm_renderer_load_font(path, font_size, app_data->default_sampler, &c->fonts[c->font_count], context)) return false;
+    if(!dm_renderer_load_font(desc, app_data->default_sampler, &c->fonts[c->font_count], context)) return false;
 
     *font_index = c->font_count++; 
 

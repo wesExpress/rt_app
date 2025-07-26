@@ -20,7 +20,7 @@ typedef struct gui_style_t
 
 bool gui_init(gui_style style, uint8_t font_count, void** gui_ctxt, dm_context* context);
 
-bool gui_load_font(const char* path, uint8_t font_size, uint8_t* font_index, void* gui_ctxt, dm_context* context);
+bool gui_load_font(dm_font_desc desc, uint8_t* font_index, void* gui_ctxt, dm_context* context);
 
 void gui_draw_quad(float x, float y, float w, float h, const float* color, void* context);
 void gui_draw_quad_border(float x, float y, float w, float h, const float* color, float* border_color, void* context);

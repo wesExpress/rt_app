@@ -30,6 +30,15 @@ bool dm_application_init(dm_context* context)
     dm_timer_start(&app_data->fps_timer, context);
 
     // gui
+    dm_font_desc f16_desc = {
+        .path="assets/fonts/JetBrainsMono-Regular.ttf",
+        .size=16
+    };
+
+    dm_font_desc f32_desc = {
+        .path="assets/fonts/JetBrainsMono-Regular.ttf",
+        .size=32
+    };
     {
         gui_style style = { 0 };
         style.text_padding_l = 15.f;
@@ -42,14 +51,17 @@ bool dm_application_init(dm_context* context)
 
         style.window_border_color[3] = 1.f;
 
+#if 0
         if(!gui_init(style, 2, &app_data->gui_context, context)) 
         {
             DM_LOG_ERROR("Could not initialize gui rendering");
             return false;
         }
 
-        if(!gui_load_font("assets/fonts/JetBrainsMono-Regular.ttf", 16, &app_data->font16, app_data->gui_context, context)) return false;
-        if(!gui_load_font("assets/fonts/JetBrainsMono-Regular.ttf", 32, &app_data->font32, app_data->gui_context, context)) return false;
+
+        if(!gui_load_font(f16_desc, &app_data->font16, app_data->gui_context, context)) return false;
+        if(!gui_load_font(f32_desc, &app_data->font32, app_data->gui_context, context)) return false;
+#endif
     }
 
     // load in models
@@ -90,6 +102,8 @@ bool dm_application_init(dm_context* context)
 
     if(!dm_renderer_create_storage_buffer(desc, &app_data->material_sb, context)) return false;
 
+    dm_font_desc fonts[] = { f16_desc, f32_desc };
+    if(!nuklear_gui_init(fonts, _countof(fonts), context)) return false;
     if(!raster_pipeline_init(context)) return false;
     if(!init_entities(context)) return false;
     if(!rt_pipeline_init(context)) return false;
@@ -104,7 +118,11 @@ void dm_application_shutdown(dm_context* context)
 {
     application_data* app_data = context->app_data;
 
-    dm_free(&app_data->gui_context);
+    nk_font_atlas_clear(&app_data->nk_context.atlas);
+    nk_buffer_clear(&app_data->nk_context.cmds);
+    nk_free(&app_data->nk_context.ctx);
+    dm_free(&app_data->nuklear_data);
+    //dm_free(&app_data->gui_context);
 }
 
 bool dm_application_update(dm_context* context)
@@ -123,6 +141,9 @@ bool dm_application_update(dm_context* context)
     camera_update(&app_data->camera, context);
 
     // gui
+    nuklear_gui_update_input(context);
+
+#if 0
     static float quad_color[] = { 0.1f,0.1f,0.7f,.8f };
     static float quad_border_color[] = { 0.f,0.f,0.f,.8f };
 
@@ -142,6 +163,7 @@ bool dm_application_update(dm_context* context)
     gui_draw_text(110.f,265.f, t, fps_color, app_data->font16, app_data->gui_context);
 
     if(dm_input_key_just_pressed(DM_KEY_SPACE, context)) app_data->ray_trace = !app_data->ray_trace;
+#endif
 
     if(dm_timer_elapsed(&app_data->fps_timer, context) >= 1)
     {
@@ -154,11 +176,26 @@ bool dm_application_update(dm_context* context)
         app_data->frame_count++;
     }
 
+    if(nk_begin(&app_data->nk_context.ctx,"Application info", nk_rect(100,100, 500,500), NK_WINDOW_BORDER | NK_WINDOW_MOVABLE | NK_WINDOW_SCALABLE | NK_WINDOW_TITLE))
+    {
+        enum {EASY, HARD};
+        static int op = EASY;
+        static int property = 20;
+
+        struct  nk_context* ctx = &app_data->nk_context.ctx;
+
+        nk_layout_row_static(ctx, 30,80,1);
+        nk_label(ctx, app_data->fps_text, NK_TEXT_LEFT);
+
+        nk_layout_row_static(ctx, 30,180,1);
+        nk_label(ctx, app_data->frame_time_text, NK_TEXT_LEFT);
+    }
+    nk_end(&app_data->nk_context.ctx);
+
     // render updates
     if(!raster_pipeline_update(context)) return false;
     if(!rt_pipeline_update(context))     return false;
     if(!debug_pipeline_update(context))  return false;
-    gui_update(app_data->gui_context, context);
     update_entities(context);
 
     return true;
@@ -168,14 +205,17 @@ bool dm_application_render(dm_context* context)
 {
     application_data* app_data = context->app_data;
 
+    // nuklear buffers
+    nuklear_gui_update_buffers(context);
+
     // raytracing has to happen outside of a render pass
     if(app_data->ray_trace) rt_pipeline_render(context);
 
     // render after
     dm_render_command_begin_render_pass(0.01f,0.01f,0.01f,1.f, context);
-        if(app_data->ray_trace)  quad_texture_render(app_data->rt_data.image, context);
-        if(!app_data->ray_trace) raster_pipeline_render(app_data->meshes[0], MAX_ENTITIES, context);
-        gui_render(app_data->gui_context, context);
+        if(app_data->ray_trace) quad_texture_render(app_data->rt_data.image, context);
+        else                    raster_pipeline_render(app_data->meshes[0], MAX_ENTITIES, context);
+        nuklear_gui_render(context);
         debug_pipeline_render(context);
     dm_render_command_end_render_pass(context);
 

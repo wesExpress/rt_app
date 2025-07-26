@@ -12,6 +12,7 @@ SET(SOURCES
     camera.c
     entities.c
 
+    rendering/nuklear_gui.c
     rendering/gui.c
     rendering/raster_pipeline.c
     rendering/rt_pipeline.c
@@ -20,6 +21,8 @@ SET(SOURCES
 )
 
 ADD_EXECUTABLE(${PROJECT_NAME} ${SOURCES})
+
+ADD_DEFINITIONS(-D_CRT_SECURE_NO_WARNINGS)
 
 if(VULKAN)
     ADD_DEFINITIONS(-DDM_VULKAN)
