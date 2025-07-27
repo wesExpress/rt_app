@@ -1,5 +1,4 @@
 #include "app.h"
-#include "rendering/gui.h"
 #include "rendering/debug_pipeline.h"
 
 #include <stdio.h>
@@ -28,41 +27,6 @@ bool dm_application_init(dm_context* context)
     // misc
     dm_timer_start(&app_data->frame_timer, context);
     dm_timer_start(&app_data->fps_timer, context);
-
-    // gui
-    dm_font_desc f16_desc = {
-        .path="assets/fonts/JetBrainsMono-Regular.ttf",
-        .size=16
-    };
-
-    dm_font_desc f32_desc = {
-        .path="assets/fonts/JetBrainsMono-Regular.ttf",
-        .size=32
-    };
-    {
-        gui_style style = { 0 };
-        style.text_padding_l = 15.f;
-        style.text_padding_r = 15.f;
-        style.text_padding_b = 15.f;
-        style.text_padding_t = 15.f;
-
-        style.window_border_h = 5.f;
-        style.window_border_w = 5.f;
-
-        style.window_border_color[3] = 1.f;
-
-#if 0
-        if(!gui_init(style, 2, &app_data->gui_context, context)) 
-        {
-            DM_LOG_ERROR("Could not initialize gui rendering");
-            return false;
-        }
-
-
-        if(!gui_load_font(f16_desc, &app_data->font16, app_data->gui_context, context)) return false;
-        if(!gui_load_font(f32_desc, &app_data->font32, app_data->gui_context, context)) return false;
-#endif
-    }
 
     // load in models
     dm_mesh_vertex_attribute attribs[] = {
@@ -102,6 +66,15 @@ bool dm_application_init(dm_context* context)
 
     if(!dm_renderer_create_storage_buffer(desc, &app_data->material_sb, context)) return false;
 
+    dm_font_desc f16_desc = {
+        .path="assets/fonts/JetBrainsMono-Regular.ttf",
+        .size=16
+    };
+
+    dm_font_desc f32_desc = {
+        .path="assets/fonts/JetBrainsMono-Regular.ttf",
+        .size=32
+    };
     dm_font_desc fonts[] = { f16_desc, f32_desc };
     if(!nuklear_gui_init(fonts, _countof(fonts), context)) return false;
     if(!raster_pipeline_init(context)) return false;
@@ -122,7 +95,6 @@ void dm_application_shutdown(dm_context* context)
     nk_buffer_clear(&app_data->nk_context.cmds);
     nk_free(&app_data->nk_context.ctx);
     dm_free(&app_data->nuklear_data);
-    //dm_free(&app_data->gui_context);
 }
 
 bool dm_application_update(dm_context* context)
@@ -143,28 +115,6 @@ bool dm_application_update(dm_context* context)
     // gui
     nuklear_gui_update_input(context);
 
-#if 0
-    static float quad_color[] = { 0.1f,0.1f,0.7f,.8f };
-    static float quad_border_color[] = { 0.f,0.f,0.f,.8f };
-
-    gui_draw_quad_border(100.f,100.f, 500.f,200.f, quad_color, quad_border_color, app_data->gui_context);
-
-    gui_draw_text(110.f,105.f, app_data->fps_text,        fps_color, app_data->font16, app_data->gui_context);
-    sprintf(t, "Instance count: %u", MAX_ENTITIES);
-    gui_draw_text(110.f,120.f, t, fps_color, app_data->font16, app_data->gui_context); 
-    gui_draw_text(110.f,155.f, app_data->frame_time_text, frame_timer_color, app_data->font32, app_data->gui_context);
-    if(app_data->ray_trace) sprintf(t, "Render: Ray tracing"); 
-    else                    sprintf(t, "Render: Raster");
-    gui_draw_text(110.f,185.f, t, fps_color, app_data->font16, app_data->gui_context);
-
-    sprintf(t, "Camera pos: %f %f %f", app_data->camera.pos[0], app_data->camera.pos[1], app_data->camera.pos[2]);
-    gui_draw_text(110.f,245.f, t, fps_color, app_data->font16, app_data->gui_context);
-    sprintf(t, "Camera forward: %f %f %f", app_data->camera.forward[0], app_data->camera.forward[1], app_data->camera.forward[2]);
-    gui_draw_text(110.f,265.f, t, fps_color, app_data->font16, app_data->gui_context);
-
-    if(dm_input_key_just_pressed(DM_KEY_SPACE, context)) app_data->ray_trace = !app_data->ray_trace;
-#endif
-
     if(dm_timer_elapsed(&app_data->fps_timer, context) >= 1)
     {
         sprintf(app_data->fps_text, "FPS: %u", app_data->frame_count);
@@ -176,7 +126,7 @@ bool dm_application_update(dm_context* context)
         app_data->frame_count++;
     }
 
-    if(nk_begin(&app_data->nk_context.ctx,"Application info", nk_rect(100,100, 500,500), NK_WINDOW_BORDER | NK_WINDOW_MOVABLE | NK_WINDOW_SCALABLE | NK_WINDOW_TITLE))
+    if(nk_begin(&app_data->nk_context.ctx,"Application info", nk_rect(100,100, 250,250), NK_WINDOW_BORDER | NK_WINDOW_MOVABLE | NK_WINDOW_SCALABLE | NK_WINDOW_TITLE))
     {
         enum {EASY, HARD};
         static int op = EASY;
@@ -184,11 +134,27 @@ bool dm_application_update(dm_context* context)
 
         struct  nk_context* ctx = &app_data->nk_context.ctx;
 
+        nk_layout_row_static(ctx, 30,180,1);
+#ifdef DM_DIRECTX12
+        nk_label(ctx, "Render backend: DX12", NK_TEXT_LEFT);
+#elif defined(DM_VULKAN)
+        nk_label(ctx, "Render backend: Vulkan", NK_TEXT_LEFT);
+#endif
+
+        nk_layout_row_static(ctx, 30,180,1);
+        if(app_data->ray_trace) nk_label(ctx, "Render mode: Ray trace", NK_TEXT_LEFT);
+        else                    nk_label(ctx, "Render mode: Raster", NK_TEXT_LEFT);
+
         nk_layout_row_static(ctx, 30,80,1);
         nk_label(ctx, app_data->fps_text, NK_TEXT_LEFT);
 
         nk_layout_row_static(ctx, 30,180,1);
         nk_label(ctx, app_data->frame_time_text, NK_TEXT_LEFT);
+
+        char buffer[512];
+        sprintf(buffer, "Entity count: %u", MAX_ENTITIES);
+        nk_layout_row_static(ctx,30,180,1);
+        nk_label(ctx, buffer, NK_TEXT_LEFT);
     }
     nk_end(&app_data->nk_context.ctx);
 
@@ -197,6 +163,8 @@ bool dm_application_update(dm_context* context)
     if(!rt_pipeline_update(context))     return false;
     if(!debug_pipeline_update(context))  return false;
     update_entities(context);
+
+    if(dm_input_key_just_pressed(DM_KEY_SPACE, context)) app_data->ray_trace = !app_data->ray_trace;
 
     return true;
 }
@@ -215,6 +183,7 @@ bool dm_application_render(dm_context* context)
     dm_render_command_begin_render_pass(0.01f,0.01f,0.01f,1.f, context);
         if(app_data->ray_trace) quad_texture_render(app_data->rt_data.image, context);
         else                    raster_pipeline_render(app_data->meshes[0], MAX_ENTITIES, context);
+
         nuklear_gui_render(context);
         debug_pipeline_render(context);
     dm_render_command_end_render_pass(context);

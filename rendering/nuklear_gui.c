@@ -37,6 +37,9 @@ typedef struct nuklear_internal_data_t
     uint16_t indices[MAX_INDEX_BUFFER];
 
     struct nk_draw_null_texture null_texture;
+
+    uint32_t screen_width, screen_height;
+    dm_mat4 ortho;
 } nuklear_gui_data;
 
 void nuklear_clipboard_copy(nk_handle user, const char* text, int len)
@@ -72,15 +75,17 @@ bool nuklear_gui_init(dm_font_desc* font_descs, uint8_t font_count, dm_context* 
 
     // === constant buffer ===
     {
-        dm_mat4 ortho;
-        dm_mat_ortho(0,(float)context->renderer.width, (float)context->renderer.height,0, -1,1, ortho);
+        dm_mat_ortho(0,(float)context->renderer.width, (float)context->renderer.height,0, -1,1, gui_data->ortho);
 
         dm_constant_buffer_desc cb_desc = {
             .size=sizeof(dm_mat4),
-            .data=&ortho
+            .data=&gui_data->ortho
         };
 
         if(!dm_renderer_create_constant_buffer(cb_desc, &gui_data->cb, context)) return false;
+
+        gui_data->screen_width  = context->renderer.width;
+        gui_data->screen_height = context->renderer.height;
     }
 
     // === vertex and index buffers ===
@@ -353,17 +358,17 @@ void nuklear_gui_update_input(dm_context* context)
                 uint32_t x,y;
                 dm_input_get_mouse_pos(&x,&y, context);
 
-                nk_input_button(ctx, x,y, convert_button_type(e.button), down);
+                nk_input_button(ctx, convert_button_type(e.button), x,y, down);
             } break;
 
             break;
 
             case DM_EVENT_MOUSE_MOVE:
             {
-                int delta_x, delta_y;
-                dm_input_get_mouse_delta(&delta_x, &delta_y, context);
+                uint32_t x,y;
+                dm_input_get_mouse_pos(&x,&y, context);
 
-                nk_input_motion(ctx, delta_x, delta_y);
+                nk_input_motion(ctx, x,y);
             } break;
 
             case DM_EVENT_MOUSE_SCROLL:
@@ -385,6 +390,12 @@ void nuklear_gui_update_buffers(dm_context* context)
     application_data* app_data = context->app_data;
     nuklear_gui_data* gui_data = app_data->nuklear_data;
 
+    // projection matrix
+    dm_mat_ortho(0,(float)context->renderer.width, (float)context->renderer.height,0, -1,1, gui_data->ortho);
+
+    dm_render_command_update_constant_buffer(&gui_data->ortho, sizeof(gui_data->ortho), gui_data->cb, context);
+
+    // vertex and index buffers
     struct nk_convert_config config = { 0 };
     NK_STORAGE const struct nk_draw_vertex_layout_element vertex_layout[] = {
         { NK_VERTEX_POSITION, NK_FORMAT_FLOAT,              NK_OFFSETOF(nuklear_vertex, position) },

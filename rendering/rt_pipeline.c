@@ -147,9 +147,9 @@ bool rt_pipeline_update(dm_context* context)
 
     dm_memcpy(app_data->rt_data.camera_data.position, app_data->camera.pos, sizeof(dm_vec4));
 
-    app_data->rt_data.scene_data.sky_color[0] = 0.1f;
-    app_data->rt_data.scene_data.sky_color[1] = 0.1f;
-    app_data->rt_data.scene_data.sky_color[2] = 0.1f;
+    app_data->rt_data.scene_data.sky_color[0] = 0.01f;
+    app_data->rt_data.scene_data.sky_color[1] = 0.01f;
+    app_data->rt_data.scene_data.sky_color[2] = 0.01f;
 
     for(uint8_t i=0; i<app_data->mesh_count; i++)
     {

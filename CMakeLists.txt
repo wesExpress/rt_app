@@ -13,7 +13,6 @@ SET(SOURCES
     entities.c
 
     rendering/nuklear_gui.c
-    rendering/gui.c
     rendering/raster_pipeline.c
     rendering/rt_pipeline.c
     rendering/debug_pipeline.c
