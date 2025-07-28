@@ -6,7 +6,6 @@
 #define MAX_VERTEX_BUFFER 512 * 1024
 #define MAX_INDEX_BUFFER  128 * 1024
 
-#define MAX_NUKLEAR_FONTS    5
 #define MAX_NUKLEAR_VERTICES 1000
 typedef struct nuklear_vertex_t
 {
@@ -27,9 +26,6 @@ typedef struct nuklear_internal_data_t
     dm_resource_handle vb, ib, pipeline;
     dm_resource_handle cb;
     dm_resource_handle sampler, font_texture;
-
-    struct nk_font* nk_fonts[MAX_NUKLEAR_FONTS];
-    uint8_t font_count;
 
     nuklear_resource_indices resource_indices;
 
@@ -224,10 +220,9 @@ bool nuklear_gui_init(dm_font_desc* font_descs, uint8_t font_count, dm_context* 
         nk_font_atlas_init_default(&app_data->nk_context.atlas);
         nk_font_atlas_begin(&app_data->nk_context.atlas);
 
-
         for(uint8_t i=0; i<font_count; i++)
         {
-            gui_data->nk_fonts[i] = nk_font_atlas_add_from_file(&app_data->nk_context.atlas, font_descs[0].path, font_descs[0].size, 0);
+            app_data->nk_context.fonts[i] = nk_font_atlas_add_from_file(&app_data->nk_context.atlas, font_descs[i].path, font_descs[i].size, 0);
 
             int w,h;
             const void* data = nk_font_atlas_bake(&app_data->nk_context.atlas, &w,&h, NK_FONT_ATLAS_RGBA32);
@@ -244,7 +239,7 @@ bool nuklear_gui_init(dm_font_desc* font_descs, uint8_t font_count, dm_context* 
 
         nk_font_atlas_end(&app_data->nk_context.atlas, nk_handle_ptr(0), &gui_data->null_texture);
 
-        nk_style_set_font(&app_data->nk_context.ctx, &gui_data->nk_fonts[0]->handle);
+        nk_style_set_font(&app_data->nk_context.ctx, &app_data->nk_context.fonts[0]->handle);
     }
 
     return true;

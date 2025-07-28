@@ -66,6 +66,15 @@ bool dm_application_init(dm_context* context)
 
     if(!dm_renderer_create_storage_buffer(desc, &app_data->material_sb, context)) return false;
 
+    app_data->lights[0].color[0] = app_data->lights[0].color[1] = app_data->lights[0].color[2] = 1; 
+    //app_data->lights[0].ambient[0] = app_data->lights[0].ambient[1] = app_data->lights[0].ambient[2] = 0.01f;
+
+    desc.size   = sizeof(app_data->lights);
+    desc.stride = sizeof(light_source);
+    desc.data   = &app_data->lights;
+
+    if(!dm_renderer_create_storage_buffer(desc, &app_data->light_buffer, context)) return false;
+
     dm_font_desc f16_desc = {
         .path="assets/fonts/JetBrainsMono-Regular.ttf",
         .size=16
@@ -83,6 +92,9 @@ bool dm_application_init(dm_context* context)
     if(!init_entity_pipeline(context)) return false;
     if(!debug_pipeline_init(context)) return false;
     if(!quad_texture_init(context)) return false;
+
+    // misc
+    app_data->clear_color.a = 1;
 
     return true;
 }
@@ -126,7 +138,7 @@ bool dm_application_update(dm_context* context)
         app_data->frame_count++;
     }
 
-    if(nk_begin(&app_data->nk_context.ctx,"Application info", nk_rect(100,100, 250,250), NK_WINDOW_BORDER | NK_WINDOW_MOVABLE | NK_WINDOW_SCALABLE | NK_WINDOW_TITLE))
+    if(nk_begin(&app_data->nk_context.ctx,"Application info", nk_rect(100,100, 350,550), NK_WINDOW_BORDER | NK_WINDOW_MOVABLE | NK_WINDOW_TITLE | NK_WINDOW_MINIMIZABLE | NK_WINDOW_DYNAMIC | NK_WINDOW_SCALABLE))
     {
         enum {EASY, HARD};
         static int op = EASY;
@@ -134,37 +146,69 @@ bool dm_application_update(dm_context* context)
 
         struct  nk_context* ctx = &app_data->nk_context.ctx;
 
-        nk_layout_row_static(ctx, 30,180,1);
+        nk_style_set_font(ctx, &app_data->nk_context.fonts[1]->handle);
+        nk_layout_row_dynamic(ctx, 30,1);
 #ifdef DM_DIRECTX12
         nk_label(ctx, "Render backend: DX12", NK_TEXT_LEFT);
 #elif defined(DM_VULKAN)
         nk_label(ctx, "Render backend: Vulkan", NK_TEXT_LEFT);
 #endif
 
-        nk_layout_row_static(ctx, 30,180,1);
+        nk_layout_row_dynamic(ctx, 30, 1);
         if(app_data->ray_trace) nk_label(ctx, "Render mode: Ray trace", NK_TEXT_LEFT);
         else                    nk_label(ctx, "Render mode: Raster", NK_TEXT_LEFT);
 
-        nk_layout_row_static(ctx, 30,80,1);
+        nk_style_set_font(ctx, &app_data->nk_context.fonts[0]->handle);
+        // render toggle
+        nk_layout_row_dynamic(ctx, 25, 1);
+        if(nk_button_label(ctx, "toggle render mode")) app_data->ray_trace = !app_data->ray_trace;
+
+        nk_layout_row_dynamic(ctx, 30,1);
         nk_label(ctx, app_data->fps_text, NK_TEXT_LEFT);
 
-        nk_layout_row_static(ctx, 30,180,1);
+        nk_layout_row_dynamic(ctx, 30,1);
         nk_label(ctx, app_data->frame_time_text, NK_TEXT_LEFT);
 
         char buffer[512];
         sprintf(buffer, "Entity count: %u", MAX_ENTITIES);
-        nk_layout_row_static(ctx,30,180,1);
+        nk_layout_row_dynamic(ctx,30,1);
         nk_label(ctx, buffer, NK_TEXT_LEFT);
+
+        //nk_layout_row_dynamic(ctx, 20, 1);
+        nk_label(ctx, "background:", NK_TEXT_LEFT);
+        nk_layout_row_dynamic(ctx, 25, 1);
+        if (nk_combo_begin_color(ctx, nk_rgb_cf(app_data->clear_color), nk_vec2(nk_widget_width(ctx),400))) {
+            nk_layout_row_dynamic(ctx, 120, 1);
+            app_data->clear_color = nk_color_picker(ctx, app_data->clear_color, NK_RGBA);
+            nk_layout_row_dynamic(ctx, 25, 1);
+            app_data->clear_color.r = nk_propertyf(ctx, "#R:", 0, app_data->clear_color.r, 1.0f, 0.01f,0.005f);
+            app_data->clear_color.g = nk_propertyf(ctx, "#G:", 0, app_data->clear_color.g, 1.0f, 0.01f,0.005f);
+            app_data->clear_color.b = nk_propertyf(ctx, "#B:", 0, app_data->clear_color.b, 1.0f, 0.01f,0.005f);
+            app_data->clear_color.a = nk_propertyf(ctx, "#A:", 0, app_data->clear_color.a, 1.0f, 0.01f,0.005f);
+            nk_combo_end(ctx);
+        }
+
+        // light source
+        nk_label(ctx, "Light Position", NK_TEXT_LEFT);
+        nk_layout_row_dynamic(ctx, 25, 4);
+        app_data->lights[0].position[0] = nk_propertyf(ctx, "X", -100, app_data->lights[0].position[0], 100, 5.f,0.5f);
+        app_data->lights[0].position[1] = nk_propertyf(ctx, "Y", -100, app_data->lights[0].position[1], 100, 5.f,0.5f);
+        app_data->lights[0].position[2] = nk_propertyf(ctx, "Z", -100, app_data->lights[0].position[2], 100, 5.f,0.5f);
     }
     nk_end(&app_data->nk_context.ctx);
+
+    app_data->rt_data.scene_data.sky_color[0] = app_data->clear_color.r;
+    app_data->rt_data.scene_data.sky_color[1] = app_data->clear_color.g;
+    app_data->rt_data.scene_data.sky_color[2] = app_data->clear_color.b;
+    app_data->rt_data.scene_data.sky_color[3] = app_data->clear_color.a;
+
+    dm_render_command_update_storage_buffer(&app_data->lights, sizeof(app_data->lights), app_data->light_buffer, context);
 
     // render updates
     if(!raster_pipeline_update(context)) return false;
     if(!rt_pipeline_update(context))     return false;
     if(!debug_pipeline_update(context))  return false;
     update_entities(context);
-
-    if(dm_input_key_just_pressed(DM_KEY_SPACE, context)) app_data->ray_trace = !app_data->ray_trace;
 
     return true;
 }
@@ -180,7 +224,7 @@ bool dm_application_render(dm_context* context)
     if(app_data->ray_trace) rt_pipeline_render(context);
 
     // render after
-    dm_render_command_begin_render_pass(0.01f,0.01f,0.01f,1.f, context);
+    dm_render_command_begin_render_pass(app_data->clear_color.r,app_data->clear_color.g,app_data->clear_color.b,app_data->clear_color.a, context);
         if(app_data->ray_trace) quad_texture_render(app_data->rt_data.image, context);
         else                    raster_pipeline_render(app_data->meshes[0], MAX_ENTITIES, context);
 

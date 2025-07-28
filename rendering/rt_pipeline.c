@@ -50,25 +50,16 @@ bool rt_pipeline_init(dm_context* context)
             .flags = DM_RT_PIPE_HIT_GROUP_FLAG_CLOSEST,
         };
 
-        dm_raytracing_pipeline_hit_group shadow_hit_group = {
-            .type=DM_RT_PIPE_HIT_GROUP_TYPE_TRIANGLES, .name="shadow_hit_group",
-#ifdef DM_DIRECTX12
-            .shaders[DM_RT_PIPE_HIT_GROUP_STAGE_CLOSEST] = "shadow_closest_hit",
-#elif defined DM_VULKAN
-#endif
-            .flags=DM_RT_PIPE_HIT_GROUP_FLAG_CLOSEST
-        };
-
         dm_raytracing_pipeline_desc rt_pipe_desc = {  
 #ifdef DM_DIRECTX12
             .shader_path = "assets/shaders/rt_shader.cso",
             .raygen = "ray_generation", 
-            .miss = { "miss", "shadow_miss" },
+            .misses = { { "miss" }, { "shadow_miss" } }, .miss_count=2,
 #elif defined(DM_VULKAN)
             .raygen="assets/shaders/rgen.spv", .miss="assets/shaders/rmiss.spv",
 #endif
-            .hit_groups={ hit_group, shadow_hit_group }, .hit_group_count=2,
-            .payload_size=sizeof(ray_payload), .max_depth=2, .max_instance_count=MAX_ENTITIES
+            .hit_groups={ hit_group }, .hit_group_count=1,
+            .payload_size=sizeof(ray_payload), .max_depth=3, .max_instance_count=MAX_ENTITIES
         };
 
         if(!dm_renderer_create_raytracing_pipeline(rt_pipe_desc, &app_data->rt_data.pipeline, context)) return false;
@@ -147,9 +138,9 @@ bool rt_pipeline_update(dm_context* context)
 
     dm_memcpy(app_data->rt_data.camera_data.position, app_data->camera.pos, sizeof(dm_vec4));
 
-    app_data->rt_data.scene_data.sky_color[0] = 0.01f;
-    app_data->rt_data.scene_data.sky_color[1] = 0.01f;
-    app_data->rt_data.scene_data.sky_color[2] = 0.01f;
+    //app_data->rt_data.scene_data.sky_color[0] = 0.01f;
+    //app_data->rt_data.scene_data.sky_color[1] = 0.01f;
+    //app_data->rt_data.scene_data.sky_color[2] = 0.01f;
 
     for(uint8_t i=0; i<app_data->mesh_count; i++)
     {
@@ -186,10 +177,11 @@ void rt_pipeline_render(dm_context* context)
     app_data->rt_data.resources.scene_data_index       = app_data->rt_data.scene_cb.descriptor_index;
     app_data->rt_data.resources.material_buffer_index  = app_data->material_sb.descriptor_index;
     app_data->rt_data.resources.mesh_buffer_index      = app_data->entities.mesh_sb.descriptor_index;
+    app_data->rt_data.resources.light_buffer_index     = app_data->light_buffer.descriptor_index;
 
     // render
     dm_render_command_bind_raytracing_pipeline(app_data->rt_data.pipeline, context);
-    dm_render_command_set_root_constants(0,7,0, &app_data->rt_data.resources, context);
+    dm_render_command_set_root_constants(0,8,0, &app_data->rt_data.resources, context);
     dm_render_command_dispatch_rays(context->renderer.width, context->renderer.height, app_data->rt_data.pipeline, context);
 }
 

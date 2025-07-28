@@ -34,6 +34,14 @@ typedef struct material_t
     uint32_t padding[2];
 } material;
 
+typedef struct light_source_t
+{
+    dm_vec3 position;
+    dm_vec3 color;
+    dm_vec3 ambient;
+    float   strength;
+} light_source;
+
 typedef struct application_data_t
 {
     entity_data          entities;
@@ -44,7 +52,8 @@ typedef struct application_data_t
     void* nuklear_data;
     nuklear_context nk_context;
 
-    dm_resource_handle default_sampler;
+    light_source lights[10];
+    dm_resource_handle light_buffer;
 
     void* gui_context;
     uint8_t font16, font32;
@@ -64,6 +73,8 @@ typedef struct application_data_t
 
     dm_timer frame_timer, fps_timer;
     uint16_t frame_count;
+
+    struct nk_colorf clear_color;
 
     bool ray_trace;
 } application_data;

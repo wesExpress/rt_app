@@ -104,6 +104,17 @@ bool quad_texture_init(dm_context* context)
         if(!dm_renderer_create_raster_pipeline(desc, &app_data->quad_texture_data.pipeline, context)) return false;
     }
 
+    // === sampler ===
+    {
+        dm_sampler_desc desc = { 
+            .address_u=DM_SAMPLER_ADDRESS_MODE_WRAP,
+            .address_v=DM_SAMPLER_ADDRESS_MODE_WRAP,
+            .address_w=DM_SAMPLER_ADDRESS_MODE_WRAP
+        };
+
+        if(!dm_renderer_create_sampler(desc, &app_data->quad_texture_data.sampler, context)) return false;
+    }
+
     return true;
 }
 
@@ -112,7 +123,7 @@ void quad_texture_render(dm_resource_handle texture, dm_context* context)
     application_data* app_data = context->app_data;
 
     app_data->quad_texture_data.resources.image_index   = texture.descriptor_index + 1; 
-    app_data->quad_texture_data.resources.sampler_index = app_data->default_sampler.descriptor_index;
+    app_data->quad_texture_data.resources.sampler_index = app_data->quad_texture_data.sampler.descriptor_index;
 
     dm_render_command_bind_raster_pipeline(app_data->quad_texture_data.pipeline, context);
     dm_render_command_set_root_constants(0,2,0, &app_data->quad_texture_data.resources, context);

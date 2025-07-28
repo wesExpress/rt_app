@@ -40,20 +40,30 @@ struct camera_data
     matrix view_proj;
 };
 
+struct light_source
+{
+    float3 position;
+    float3 color;
+    float3 ambient;
+    float  strength;
+};
+
 struct render_resources 
 {
     uint scene_cb;
     uint material_buffer_index;
     uint mesh_buffer_index;
+    uint light_buffer_index;
 };
 
 ConstantBuffer<render_resources> resources : register(b0);
 
 float4 main(FRAGMENT_IN frag_in) : SV_Target
 {
-    ConstantBuffer<camera_data> camera   = ResourceDescriptorHeap[resources.scene_cb];
-    StructuredBuffer<mesh_data> meshes   = ResourceDescriptorHeap[resources.mesh_buffer_index];
-    StructuredBuffer<material> materials = ResourceDescriptorHeap[resources.material_buffer_index];
+    ConstantBuffer<camera_data> camera    = ResourceDescriptorHeap[resources.scene_cb];
+    StructuredBuffer<mesh_data> meshes    = ResourceDescriptorHeap[resources.mesh_buffer_index];
+    StructuredBuffer<material> materials  = ResourceDescriptorHeap[resources.material_buffer_index];
+    StructuredBuffer<light_source> lights = ResourceDescriptorHeap[resources.light_buffer_index];
 
     mesh_data mesh = meshes[frag_in.instance_index];
     material  mat  = materials[mesh.material_index];
@@ -84,12 +94,10 @@ float4 main(FRAGMENT_IN frag_in) : SV_Target
     normal        = normalize(mul(normal, frag_in.tbn));
 
     // lighting
-    float3 light_pos     = float3(0,0,0);
-    float3 light_color   = float3(1,1,1);
-    float3 light_ambient = float3(0,0,0);
+    light_source light = lights[0];
 
-    float3 color = calculate_lighting(frag_in.world_pos.xyz, normal, light_pos, light_color, light_ambient, diffuse_color, transpose(camera.view_proj)[3].xyz, roughness, metallic);
+    float3 color = calculate_lighting(frag_in.world_pos.xyz, normal, light.position, light.color, light.ambient, diffuse_color, transpose(camera.view_proj)[3].xyz, roughness, metallic);
 
     // final color
-    return float4(light_ambient * occlusion + color + emission, 1);
+    return float4(light.ambient * occlusion + color + emission, 1);
 }

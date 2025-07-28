@@ -10,7 +10,7 @@ struct ray_payload
 
 struct shadow_ray_payload
 {
-    uint miss;
+    float attenuation;
 };
 
 struct camera_data
@@ -63,6 +63,14 @@ struct mesh_data
     uint padding;
 };
 
+struct light_source
+{
+    float3 position;
+    float3 color;
+    float3 ambient;
+    float  strength;
+};
+
 struct render_resources
 {
     uint acceleration_structure;
@@ -71,6 +79,7 @@ struct render_resources
     uint scene_data;
     uint material_buffer_index;
     uint mesh_buffer_index;
+    uint light_buffer_index;
 };
 
 ConstantBuffer<render_resources> resources : register(b0);
@@ -125,7 +134,7 @@ void ray_generation()
         ray.TMin      = 0.001f;
         ray.TMax      = 1000.f;
 
-        TraceRay(scene, RAY_FLAG_NONE, 0xFF, 0,2,0, ray, p);
+        TraceRay(scene, RAY_FLAG_NONE, 0xFF, 0,0,0, ray, p);
 
         color += p.color;
     }   
@@ -194,6 +203,7 @@ void closest_hit(inout ray_payload p, BuiltInTriangleIntersectionAttributes attr
 
     StructuredBuffer<mesh_data> mesh_buffer    = ResourceDescriptorHeap[resources.mesh_buffer_index];
     StructuredBuffer<material> material_buffer = ResourceDescriptorHeap[resources.material_buffer_index];
+    StructuredBuffer<light_source> lights      = ResourceDescriptorHeap[resources.light_buffer_index];
 
     mesh_data mesh = mesh_buffer[inst_index];
     material  mat  = material_buffer[mesh.material_index];
@@ -268,26 +278,32 @@ void closest_hit(inout ray_payload p, BuiltInTriangleIntersectionAttributes attr
     float roughness = metallic_roughness.g;
 
     // lighting
-    float3 light_pos     = float3(0,0,0);
-    float3 light_color   = float3(1,1,1);
-    float3 light_ambient = float3(0,0,0);
+    light_source light = lights[0];
 
-    float3 color = calculate_lighting(position, normal, light_pos, light_color, light_ambient, diffuse_color, WorldRayOrigin(), roughness, metallic);
+    float3 color = calculate_lighting(position, normal, light.position, light.color, light.ambient, diffuse_color, WorldRayOrigin(), roughness, metallic);
 
-    p.color.rgb = light_ambient * occlusion + color + emission;
+    // shadows
+    shadow_ray_payload shadow_p;
+    shadow_p.attenuation = 1;
+
+    float3 light_dir = light.position - position;
+
+    RayDesc shadow_ray;
+    shadow_ray.Origin    = position; 
+    shadow_ray.Direction = normalize(light_dir);
+    shadow_ray.TMin      = 0.001f;
+    shadow_ray.TMax      = length(light_dir);
+
+    TraceRay(scene, RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, 0xFF, 0,0,1, shadow_ray, shadow_p);
+
+    p.color.rgb = light.ambient * occlusion + color * shadow_p.attenuation + emission;
 }
 
-/*******************
-* SHADOW HIT GROUP *
-********************/
-[shader("closesthit")]
-void shadow_closest_hit(inout shadow_ray_payload p, BuiltInTriangleIntersectionAttributes attrs)
-{
-    p.miss = 0;
-}
-
+/*************
+* SHADOW RAY *
+**************/
 [shader("miss")]
 void shadow_miss(inout shadow_ray_payload p)
 {
-    p.miss = 1;
+    p.attenuation = 0.f;
 }

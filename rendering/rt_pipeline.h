@@ -16,6 +16,7 @@ typedef struct rt_resources_t
     uint32_t scene_data_index;
     uint32_t material_buffer_index;
     uint32_t mesh_buffer_index;
+    uint32_t light_buffer_index;
 } rt_resources;
 
 typedef struct rt_camera_data_t
