@@ -59,8 +59,14 @@ struct material
 struct mesh_data
 {
     uint vb_index, ib_index;
-    uint material_index;
-    uint padding;
+    uint padding[2];
+};
+
+struct node_data
+{
+    uint   mesh_index, material_index;
+    uint   padding[2];
+    matrix model;
 };
 
 struct light_source
@@ -74,9 +80,11 @@ struct light_source
 struct render_resources
 {
     uint acceleration_structure;
-    uint image, random_image;
+    uint image;
+    uint random_image;
     uint camera_data;
     uint scene_data;
+    uint node_buffer_index;
     uint material_buffer_index;
     uint mesh_buffer_index;
     uint light_buffer_index;
@@ -95,7 +103,7 @@ inline float3 get_direction(uint2 index, uint2 screen_dimensions, float3 origin,
     const float  aspect_ratio = float(screen_dimensions.x) / float(screen_dimensions.y);
 
     // get screen position
-    const float2 ndc  = (float2(index) + random_float(seed)) / float2(screen_dimensions);
+    const float2 ndc  = (float2(index) + 0.5f) / float2(screen_dimensions);
     float2 screen_pos = ndc * 2.f - 1.f;
     screen_pos.y *= -1.f;
 
@@ -201,12 +209,14 @@ void closest_hit(inout ray_payload p, BuiltInTriangleIntersectionAttributes attr
 
     RaytracingAccelerationStructure scene = ResourceDescriptorHeap[resources.acceleration_structure];
 
+    StructuredBuffer<node_data> node_buffer    = ResourceDescriptorHeap[resources.node_buffer_index];
     StructuredBuffer<mesh_data> mesh_buffer    = ResourceDescriptorHeap[resources.mesh_buffer_index];
     StructuredBuffer<material> material_buffer = ResourceDescriptorHeap[resources.material_buffer_index];
     StructuredBuffer<light_source> lights      = ResourceDescriptorHeap[resources.light_buffer_index];
 
-    mesh_data mesh = mesh_buffer[inst_index];
-    material  mat  = material_buffer[mesh.material_index];
+    node_data node = node_buffer[inst_index];
+    mesh_data mesh = mesh_buffer[node.mesh_index];
+    material  mat  = material_buffer[node.material_index];
 
     Texture2D    diffuse_texture = ResourceDescriptorHeap[mat.diffuse_texture_index];
     Texture2D    metallic_map    = ResourceDescriptorHeap[mat.metallic_texture_index];
@@ -284,7 +294,7 @@ void closest_hit(inout ray_payload p, BuiltInTriangleIntersectionAttributes attr
 
     // shadows
     shadow_ray_payload shadow_p;
-    shadow_p.attenuation = 1;
+    shadow_p.attenuation = 0;
 
     float3 light_dir = light.position - position;
 
@@ -294,7 +304,7 @@ void closest_hit(inout ray_payload p, BuiltInTriangleIntersectionAttributes attr
     shadow_ray.TMin      = 0.001f;
     shadow_ray.TMax      = length(light_dir);
 
-    TraceRay(scene, RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, 0xFF, 0,0,1, shadow_ray, shadow_p);
+    TraceRay(scene, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, 0xFF, 0,0,1, shadow_ray, shadow_p);
 
     p.color.rgb = light.ambient * occlusion + color * shadow_p.attenuation + emission;
 }
@@ -305,5 +315,5 @@ void closest_hit(inout ray_payload p, BuiltInTriangleIntersectionAttributes attr
 [shader("miss")]
 void shadow_miss(inout shadow_ray_payload p)
 {
-    p.attenuation = 0.f;
+    p.attenuation = 1.f;
 }

@@ -1,6 +1,5 @@
 #include "rt_pipeline.h"
 #include "../app.h"
-#include "../entities.h"
 
 typedef struct ray_payload_t
 {
@@ -8,7 +7,7 @@ typedef struct ray_payload_t
     uint32_t bounce_count;
 } ray_payload;
 
-bool rt_pipeline_init(dm_context* context)
+bool rt_pipeline_init(dm_scene scene, dm_context* context)
 {
     application_data* app_data = context->app_data;
 
@@ -59,44 +58,61 @@ bool rt_pipeline_init(dm_context* context)
             .raygen="assets/shaders/rgen.spv", .miss="assets/shaders/rmiss.spv",
 #endif
             .hit_groups={ hit_group }, .hit_group_count=1,
-            .payload_size=sizeof(ray_payload), .max_depth=3, .max_instance_count=MAX_ENTITIES
+            .payload_size=sizeof(ray_payload), .max_depth=3, 
         };
 
         if(!dm_renderer_create_raytracing_pipeline(rt_pipe_desc, &app_data->rt_data.pipeline, context)) return false;
     }
 
     // === bottom-levels ===
+    app_data->rt_data.blas = dm_alloc(sizeof(dm_resource_handle) * scene.mesh_count);
+    app_data->rt_data.blas_addresses = dm_alloc(sizeof(size_t) * scene.mesh_count);
     {
-        for(uint32_t i=0; i<app_data->mesh_count; i++)
+        for(uint32_t i=0; i<scene.mesh_count; i++)
         {
             dm_blas_desc desc = { 0 };
             desc.geometry_type = DM_BLAS_GEOMETRY_TYPE_TRIANGLES;
             desc.flags         = DM_BLAS_GEOMETRY_FLAG_OPAQUE;
             desc.vertex_type   = DM_BLAS_VERTEX_TYPE_FLOAT_3;
-            desc.vertex_count  = app_data->meshes[i].vertex_count;
-            desc.vertex_buffer = app_data->meshes[i].vb;
-            desc.vertex_stride = app_data->meshes[i].vertex_stride;
-            desc.index_type    = app_data->meshes[i].index_type;
-            desc.index_count   = app_data->meshes[i].index_count;
+            desc.vertex_buffer = scene.meshes[i].vb;
+            desc.index_buffer  = scene.meshes[i].ib;
+            desc.vertex_count  = scene.meshes[i].vertex_count;
+            desc.vertex_stride = scene.meshes[i].vertex_stride;
+            desc.index_type    = scene.meshes[i].index_type;
+            desc.index_count   = scene.meshes[i].index_count;
 
             if(!dm_renderer_create_blas(desc, &app_data->rt_data.blas[i], context)) return false;
+            if(!dm_renderer_get_blas_gpu_address(app_data->rt_data.blas[i], &app_data->rt_data.blas_addresses[i], context)) return false;
         }
     }
 
     // === fill in and create rt instance buffer ===
     {
-        dm_storage_buffer_desc desc = { 0 };
-        desc.size   = MAX_ENTITIES * sizeof(dm_raytracing_instance);
-        desc.stride = sizeof(dm_raytracing_instance);
-        desc.data   = app_data->entities.rt_instances;
+        app_data->rt_data.instances = dm_alloc(sizeof(dm_raytracing_instance) * scene.node_count);
 
-        if(!dm_renderer_create_storage_buffer(desc, &app_data->entities.rt_instance_sb, context)) return false;
+        for(uint32_t i=0; i<scene.node_count; i++)
+        {
+            dm_raytracing_instance* instance = &app_data->rt_data.instances[i];
+            dm_scene_node node = scene.nodes[i];
+
+            instance->blas_address = app_data->rt_data.blas_addresses[node.mesh_index];
+            instance->mask         = 0xFF;
+            instance->id           = i;
+            dm_memcpy(instance->transform, node.model_matrix, sizeof(float) * 4 * 3);
+        }
+
+        dm_storage_buffer_desc desc = { 0 };
+        desc.size   = scene.node_count * sizeof(dm_raytracing_instance);
+        desc.stride = sizeof(dm_raytracing_instance);
+        desc.data   = app_data->rt_data.instances;
+
+        if(!dm_renderer_create_storage_buffer(desc, &app_data->rt_data.instance_sb, context)) return false;
     }
 
     // === top-level ===
     {
         dm_tlas_desc tlas_desc = { 
-            .instance_count=MAX_ENTITIES, .instance_buffer=app_data->entities.rt_instance_sb
+            .instance_count=scene.node_count, .instance_buffer=app_data->rt_data.instance_sb
         };
 
         if(!dm_renderer_create_tlas(tlas_desc, &app_data->rt_data.tlas, context)) return false; 
@@ -123,7 +139,16 @@ bool rt_pipeline_init(dm_context* context)
     return true;
 }
 
-bool rt_pipeline_update(dm_context* context)
+void rt_pipeline_shutdown(dm_context* context)
+{
+    application_data* app_data = context->app_data;
+
+    dm_free((void**)&app_data->rt_data.instances);
+    dm_free((void**)&app_data->rt_data.blas);
+    dm_free((void**)&app_data->rt_data.blas_addresses);
+}
+
+bool rt_pipeline_update(dm_scene scene, dm_context* context)
 {
     application_data* app_data = context->app_data;
 
@@ -138,11 +163,7 @@ bool rt_pipeline_update(dm_context* context)
 
     dm_memcpy(app_data->rt_data.camera_data.position, app_data->camera.pos, sizeof(dm_vec4));
 
-    //app_data->rt_data.scene_data.sky_color[0] = 0.01f;
-    //app_data->rt_data.scene_data.sky_color[1] = 0.01f;
-    //app_data->rt_data.scene_data.sky_color[2] = 0.01f;
-
-    for(uint8_t i=0; i<app_data->mesh_count; i++)
+    for(uint8_t i=0; i<app_data->sponza_scene.mesh_count; i++)
     {
         if(!dm_renderer_get_blas_gpu_address(app_data->rt_data.blas[i], &app_data->rt_data.blas_addresses[i], context)) return false;
     }
@@ -151,7 +172,7 @@ bool rt_pipeline_update(dm_context* context)
     dm_render_command_update_constant_buffer(&app_data->rt_data.camera_data, sizeof(rt_camera_data), app_data->rt_data.camera_cb, context);
     dm_render_command_update_constant_buffer(&app_data->rt_data.scene_data, sizeof(scene_cb), app_data->rt_data.scene_cb, context);
 
-    dm_render_command_update_tlas(MAX_ENTITIES, app_data->rt_data.tlas, context);
+    dm_render_command_update_tlas(scene.node_count, app_data->rt_data.tlas, context);
 
     if(app_data->rt_data.image_width != context->renderer.width || app_data->rt_data.image_height != context->renderer.height)
     {
@@ -175,13 +196,14 @@ void rt_pipeline_render(dm_context* context)
     app_data->rt_data.resources.random_image           = app_data->rt_data.random_image.descriptor_index;
     app_data->rt_data.resources.camera_data_index      = app_data->rt_data.camera_cb.descriptor_index;
     app_data->rt_data.resources.scene_data_index       = app_data->rt_data.scene_cb.descriptor_index;
+    app_data->rt_data.resources.node_buffer_index      = app_data->node_buffer.descriptor_index;
     app_data->rt_data.resources.material_buffer_index  = app_data->material_sb.descriptor_index;
-    app_data->rt_data.resources.mesh_buffer_index      = app_data->entities.mesh_sb.descriptor_index;
+    app_data->rt_data.resources.mesh_buffer_index      = app_data->mesh_sb.descriptor_index;
     app_data->rt_data.resources.light_buffer_index     = app_data->light_buffer.descriptor_index;
 
     // render
     dm_render_command_bind_raytracing_pipeline(app_data->rt_data.pipeline, context);
-    dm_render_command_set_root_constants(0,8,0, &app_data->rt_data.resources, context);
+    dm_render_command_set_root_constants(0,9,0, &app_data->rt_data.resources, context);
     dm_render_command_dispatch_rays(context->renderer.width, context->renderer.height, app_data->rt_data.pipeline, context);
 }
 

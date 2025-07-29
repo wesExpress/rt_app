@@ -14,6 +14,7 @@ typedef struct rt_resources_t
     uint32_t image, random_image;
     uint32_t camera_data_index;
     uint32_t scene_data_index;
+    uint32_t node_buffer_index;
     uint32_t material_buffer_index;
     uint32_t mesh_buffer_index;
     uint32_t light_buffer_index;
@@ -31,9 +32,13 @@ typedef struct rt_pipeline_data_t
     dm_resource_handle tlas;
     dm_resource_handle scene_cb, camera_cb;
     dm_resource_handle image, random_image;
-    dm_resource_handle blas[10];
+    dm_resource_handle instance_sb;
 
-    size_t blas_addresses[10];
+    dm_resource_handle* blas;
+    size_t*             blas_addresses;
+
+    dm_raytracing_instance* instances;
+    uint32_t instance_count;
 
     scene_cb scene_data;
     rt_camera_data camera_data;
@@ -43,8 +48,10 @@ typedef struct rt_pipeline_data_t
     uint32_t image_width, image_height;
 } rt_pipeline_data;
 
-bool rt_pipeline_init(dm_context* context);
-bool rt_pipeline_update(dm_context* context);
+bool rt_pipeline_init(dm_scene scene, dm_context* context);
+void rt_pipeline_shutdown(dm_context* context);
+bool rt_pipeline_update(dm_scene scene, dm_context* context);
 void rt_pipeline_render(dm_context* context);
+
 
 #endif

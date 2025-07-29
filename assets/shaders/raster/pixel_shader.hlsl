@@ -28,11 +28,11 @@ struct material
     uint padding[2];
 };
 
-struct mesh_data
+struct node_data
 {
-    uint vb_index, ib_index;
-    uint material_index;
-    uint padding;
+    uint   mesh_index, material_index;
+    uint   padding[2];
+    matrix model;
 };
 
 struct camera_data
@@ -53,6 +53,7 @@ struct render_resources
     uint scene_cb;
     uint material_buffer_index;
     uint mesh_buffer_index;
+    uint node_buffer_index;
     uint light_buffer_index;
 };
 
@@ -61,12 +62,12 @@ ConstantBuffer<render_resources> resources : register(b0);
 float4 main(FRAGMENT_IN frag_in) : SV_Target
 {
     ConstantBuffer<camera_data> camera    = ResourceDescriptorHeap[resources.scene_cb];
-    StructuredBuffer<mesh_data> meshes    = ResourceDescriptorHeap[resources.mesh_buffer_index];
     StructuredBuffer<material> materials  = ResourceDescriptorHeap[resources.material_buffer_index];
+    StructuredBuffer<node_data> nodes     = ResourceDescriptorHeap[resources.node_buffer_index];
     StructuredBuffer<light_source> lights = ResourceDescriptorHeap[resources.light_buffer_index];
 
-    mesh_data mesh = meshes[frag_in.instance_index];
-    material  mat  = materials[mesh.material_index];
+    node_data node = nodes[frag_in.instance_index];
+    material  mat  = materials[node.material_index];
 
     Texture2D    diffuse_texture = ResourceDescriptorHeap[mat.diffuse_texture_index];
     Texture2D    metallic_map    = ResourceDescriptorHeap[mat.metallic_texture_index];

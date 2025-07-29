@@ -33,8 +33,14 @@ struct material
 struct mesh_data
 {
     uint vb_index, ib_index;
-    uint material_index;
-    uint padding;
+    uint padding[2];
+};
+
+struct node_data
+{
+    uint mesh_index, material_index;
+    uint padding[2];
+    mat4 model;
 };
 
 struct camera_data
@@ -42,16 +48,30 @@ struct camera_data
     mat4 view_proj;
 };
 
+struct light_source
+{
+    vec3 position;
+    vec3 color;
+    vec3 ambient;
+    float strength;
+};
+
 layout(push_constant) uniform render_resources
 {
     uint camera_data_index;
     uint material_buffer_index;
     uint mesh_buffer_index;
+    uint node_buffer_index;
+    uint light_buffer_index;
 };
 
 layout(set=0, binding=0) uniform u0 { camera_data data; } scene_uniforms[RESOURCE_HEAP_SIZE];
-layout(std140, set=0, binding=0) buffer b0 { material data[]; }  materials[RESOURCE_HEAP_SIZE];
-layout(std140, set=0, binding=0) buffer b1 { mesh_data data[]; } meshes[RESOURCE_HEAP_SIZE];
+
+layout(std140, set=0, binding=0) buffer b0 { node_data data[]; } node_buffer[RESOURCE_HEAP_SIZE];
+layout(std140, set=0, binding=0) buffer b1 { material data[]; }  materials[RESOURCE_HEAP_SIZE];
+layout(std140, set=0, binding=0) buffer b2 { mesh_data data[]; } meshes[RESOURCE_HEAP_SIZE];
+layout(std140, set=0, binding=0) buffer b3 { light_source data[]; } light_buffer[RESOURCE_HEAP_SIZE];
+
 layout(set=0, binding=0) uniform texture2D textures[RESOURCE_HEAP_SIZE];
 layout(set=1, binding=0) uniform sampler   samplers[SAMPLER_HEAP_SIZE];
 
@@ -60,8 +80,10 @@ void main()
     vec3 light = vec3(0,0,0);
 
     mat4 view_proj = scene_uniforms[camera_data_index].data.view_proj;
-    mesh_data mesh = meshes[mesh_buffer_index].data[instance_index];
-    material  mat  = materials[material_buffer_index].data[mesh.material_index];
+
+    node_data node = node_buffer[node_buffer_index].data[instance_index];
+    mesh_data mesh = meshes[mesh_buffer_index].data[node.mesh_index];
+    material  mat  = materials[material_buffer_index].data[node.material_index];
 
     vec3 diffuse_color      = texture(sampler2D(textures[mat.diffuse_texture_index],  samplers[mat.diffuse_sampler_index]),   fragment_tex_coords).rgb; 
     vec3 metallic_roughness = texture(sampler2D(textures[mat.metallic_texture_index], samplers[mat.metallic_sampler_index]),  fragment_tex_coords).rgb;
@@ -76,12 +98,10 @@ void main()
     vec3 normal = normalize(tbn * normal_map_normal);
 
     // lighting
-    vec3 light_pos = { 0,0,0 };
-    vec3 light_color = { 1,1,1 };
-    vec3 light_ambient = { 0,0,0 };
+    light_source light = light_buffer[light_buffer_index].data[0];
 
-    vec3 color = calculate_lighting(world_pos.xyz, normal, light_pos, light_color, light_ambient, diffuse_color, view_proj[3].xyz, roughness, metallic);
+    vec3 color = calculate_lighting(world_pos.xyz, normal, light.pos, light.color, light.ambient, diffuse_color, view_proj[3].xyz, roughness, metallic);
 
-    pixel_color = vec4(light_ambient * occlusion + color + emission, 1);
+    pixel_color = vec4(light.ambient * occlusion + color + emission, 1);
 }
 

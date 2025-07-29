@@ -10,7 +10,6 @@ ADD_SUBDIRECTORY(DarkMatter)
 SET(SOURCES 
     app.c
     camera.c
-    entities.c
 
     rendering/nuklear_gui.c
     rendering/raster_pipeline.c

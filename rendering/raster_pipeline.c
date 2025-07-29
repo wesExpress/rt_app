@@ -13,16 +13,6 @@ bool raster_pipeline_init(dm_context* context)
 {
     application_data* app_data = context->app_data;
 
-    // === vertex and index buffers ===
-    {
-        dm_vertex_buffer_desc desc = { 0 };
-        desc.stride = sizeof(raster_inst);
-        desc.size   = sizeof(app_data->raster_data.instances);
-        desc.data   = NULL;
-
-        if(!dm_renderer_create_vertex_buffer(desc, &app_data->raster_data.inst_vb, context)) return false;
-    }
-
     // === constant buffer ===
     {
         dm_constant_buffer_desc desc = { 0 };
@@ -67,16 +57,8 @@ bool raster_pipeline_init(dm_context* context)
             .offset=offsetof(raster_vertex, color)
         };
 
-        dm_input_element_desc model_element = {
-            .name="MODEL",
-            .format=DM_INPUT_ELEMENT_FORMAT_MATRIX_4x4,
-            .class=DM_INPUT_ELEMENT_CLASS_PER_INSTANCE,
-            .stride=sizeof(raster_inst),
-            .offset=offsetof(raster_inst, model)
-        };
-
         dm_raster_input_assembler_desc input_assembler = {
-            .input_elements = { pos_element,normal_element,tangent_element,color_element,model_element }, .input_element_count=5,
+            .input_elements = { pos_element,normal_element,tangent_element,color_element }, .input_element_count=4,
             .topology=DM_INPUT_TOPOLOGY_TRIANGLE_LIST
         };
 
@@ -122,29 +104,23 @@ bool raster_pipeline_update(dm_context* context)
     return true;
 }
 
-void raster_pipeline_render(dm_mesh mesh, uint32_t count, dm_context* context)
+void raster_pipeline_render(dm_scene scene, dm_context* context)
 {
-    if(count==0) return;
-
     application_data* app_data = context->app_data;
 
     app_data->raster_data.render_data.scene_cb              = app_data->raster_data.cb.descriptor_index;
     app_data->raster_data.render_data.material_buffer_index = app_data->material_sb.descriptor_index;
-    app_data->raster_data.render_data.mesh_buffer_index     = app_data->entities.mesh_sb.descriptor_index;
+    app_data->raster_data.render_data.mesh_buffer_index     = app_data->mesh_sb.descriptor_index;
+    app_data->raster_data.render_data.node_buffer_index     = app_data->node_buffer.descriptor_index;
     app_data->raster_data.render_data.light_buffer_index    = app_data->light_buffer.descriptor_index;
 
     dm_render_command_bind_raster_pipeline(app_data->raster_data.pipeline, context);
-    dm_render_command_set_root_constants(0,4,0, &app_data->raster_data.render_data, context);
-    dm_render_command_bind_vertex_buffer(mesh.vb, 0, context);
-    dm_render_command_bind_vertex_buffer(app_data->raster_data.inst_vb, 1, context);
+    for(uint32_t i=0; i<scene.node_count; i++)
+    {
+        dm_render_command_set_root_constants(0,5,0, &app_data->raster_data.render_data, context);
+        dm_render_command_bind_vertex_buffer(scene.meshes[scene.nodes[i].mesh_index].vb, 0, context);
+        dm_render_command_bind_index_buffer(scene.meshes[scene.nodes[i].mesh_index].ib, context);
 
-    if(mesh.index_count)
-    {
-        dm_render_command_bind_index_buffer(mesh.ib, context);
-        dm_render_command_draw_instanced_indexed(count,0, mesh.index_count,0, 0, context);
-    }
-    else
-    {
-        dm_render_command_draw_instanced(count,0,mesh.vertex_count,0, context);
+        dm_render_command_draw_instanced_indexed(1,0,scene.meshes[scene.nodes[i].mesh_index].vertex_count,0,0, context);
     }
 }

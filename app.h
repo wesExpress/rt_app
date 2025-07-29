@@ -3,7 +3,7 @@
 
 #include "dm.h"
 
-#include "entities.h"
+//#include "entities.h"
 #include "rendering/raster_pipeline.h"
 #include "rendering/rt_pipeline.h"
 #include "rendering/debug_pipeline.h"
@@ -11,9 +11,6 @@
 #include "rendering/nuklear_gui.h"
 
 #include "camera.h"
-
-#define MAX_MESHES    10
-#define MAX_MATERIALS 10
 
 typedef struct material_t
 {
@@ -42,9 +39,15 @@ typedef struct light_source_t
     float   strength;
 } light_source;
 
+typedef struct mesh_t
+{
+    uint32_t vb_index, ib_index;
+    uint32_t padding[2];
+} mesh;
+
 typedef struct application_data_t
 {
-    entity_data          entities;
+    //entity_data          entities;
     raster_pipeline_data raster_data;
     rt_pipeline_data     rt_data;
     debug_pipeline_data  debug_data;
@@ -55,6 +58,8 @@ typedef struct application_data_t
     light_source lights[10];
     dm_resource_handle light_buffer;
 
+    dm_resource_handle node_buffer;
+
     void* gui_context;
     uint8_t font16, font32;
 
@@ -62,12 +67,15 @@ typedef struct application_data_t
     char frame_time_text[512];
     char gpu_time_text[512];
 
-    dm_mesh  meshes[MAX_MESHES];
-    uint16_t mesh_count;
+    dm_scene sponza_scene;
 
-    material    materials[MAX_MATERIALS];
-    uint16_t    material_count;
-    dm_resource_handle material_sb;
+    material* materials;
+    mesh*     meshes;
+    dm_resource_handle material_sb, mesh_sb;
+    uint32_t material_count;
+
+    dm_resource_handle white_texture, black_texture;
+    dm_resource_handle default_sampler;
 
     simple_camera camera;
 
