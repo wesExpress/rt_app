@@ -44,7 +44,7 @@ bool rt_pipeline_init(dm_scene scene, dm_context* context)
 #ifdef DM_DIRECTX12
             .shaders[DM_RT_PIPE_HIT_GROUP_STAGE_CLOSEST] = "closest_hit",
 #elif defined(DM_VULKAN)
-            .shaders[DM_RT_PIPE_HIT_GROUP_STAGE_CLOSEST] = "assets/shaders/rchit.spv",
+            .shaders[DM_RT_PIPE_HIT_GROUP_STAGE_CLOSEST] = "assets/shaders/rt_chit.spv",
 #endif
             .flags = DM_RT_PIPE_HIT_GROUP_FLAG_CLOSEST,
         };
@@ -53,11 +53,11 @@ bool rt_pipeline_init(dm_scene scene, dm_context* context)
 #ifdef DM_DIRECTX12
             .shader_path = "assets/shaders/rt_shader.cso",
             .raygen = "ray_generation", 
-            .misses = { { "miss" }, { "shadow_miss" } }, .miss_count=2,
+            .misses = { { "miss" }, { "shadow_miss" } }, 
 #elif defined(DM_VULKAN)
-            .raygen="assets/shaders/rgen.spv", .miss="assets/shaders/rmiss.spv",
+            .raygen="assets/shaders/rt_gen.spv", .misses={ { "assets/shaders/rt_miss.spv" }, { "assets/shaders/rt_shadow_miss.spv" } },
 #endif
-            .hit_groups={ hit_group }, .hit_group_count=1,
+            .miss_count=2, .hit_groups={ hit_group }, .hit_group_count=1,
             .payload_size=sizeof(ray_payload), .max_depth=3, 
         };
 
@@ -98,7 +98,10 @@ bool rt_pipeline_init(dm_scene scene, dm_context* context)
             instance->blas_address = app_data->rt_data.blas_addresses[node.mesh_index];
             instance->mask         = 0xFF;
             instance->id           = i;
-            dm_memcpy(instance->transform, node.model_matrix, sizeof(float) * 4 * 3);
+
+            dm_mat4 dum;
+            dm_mat4_transpose(node.model_matrix, dum);
+            dm_memcpy(instance->transform, dum, sizeof(float) * 4 * 3);
         }
 
         dm_storage_buffer_desc desc = { 0 };

@@ -71,10 +71,9 @@ struct node_data
 
 struct light_source
 {
-    float3 position;
-    float3 color;
-    float3 ambient;
-    float  strength;
+    float4 position_str;
+    float4 color;
+    float4 ambient;
 };
 
 struct render_resources
@@ -290,13 +289,13 @@ void closest_hit(inout ray_payload p, BuiltInTriangleIntersectionAttributes attr
     // lighting
     light_source light = lights[0];
 
-    float3 color = calculate_lighting(position, normal, light.position, light.color, light.ambient, diffuse_color, WorldRayOrigin(), roughness, metallic);
+    float3 color = calculate_lighting(position, normal, light.position_str.xyz, light.color.rgb, light.ambient.rgb, diffuse_color, WorldRayOrigin(), roughness, metallic);
 
     // shadows
     shadow_ray_payload shadow_p;
-    shadow_p.attenuation = 0;
+    shadow_p.attenuation = 0.2f;
 
-    float3 light_dir = light.position - position;
+    float3 light_dir = light.position_str.xyz - position;
 
     RayDesc shadow_ray;
     shadow_ray.Origin    = position; 
@@ -306,7 +305,7 @@ void closest_hit(inout ray_payload p, BuiltInTriangleIntersectionAttributes attr
 
     TraceRay(scene, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, 0xFF, 0,0,1, shadow_ray, shadow_p);
 
-    p.color.rgb = light.ambient * occlusion + color * shadow_p.attenuation + emission;
+    p.color.rgb = light.ambient.rgb * occlusion + color * shadow_p.attenuation + emission;
 }
 
 /*************

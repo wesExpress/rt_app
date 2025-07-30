@@ -13,8 +13,8 @@ bool dm_application_init(dm_context* context)
     application_data* app_data = context->app_data;
 
     // === camera ===
-    dm_vec3 pos = { 0,0,6 };
-    dm_vec3 forward = { 0,0,-1 };
+    dm_vec3 pos = { 0,5,0 };
+    dm_vec3 forward = { -1,0,0 };
 
     camera_init(pos, forward, &app_data->camera, context);
 
@@ -124,6 +124,8 @@ bool dm_application_init(dm_context* context)
 
         if(!dm_renderer_create_storage_buffer(desc, &app_data->material_sb, context)) return false;
 
+        app_data->lights[0].position_str[1] = 5.f;
+
         app_data->lights[0].color[0] = app_data->lights[0].color[1] = app_data->lights[0].color[2] = 1; 
 
         desc.size   = sizeof(app_data->lights);
@@ -145,9 +147,7 @@ bool dm_application_init(dm_context* context)
     dm_font_desc fonts[] = { f16_desc, f32_desc };
     if(!nuklear_gui_init(fonts, _countof(fonts), context)) return false;
     if(!raster_pipeline_init(context)) return false;
-    //if(!init_entities(context)) return false;
     if(!rt_pipeline_init(app_data->sponza_scene, context)) return false;
-    //if(!init_entity_pipeline(context)) return false;
     if(!debug_pipeline_init(context)) return false;
     if(!quad_texture_init(context)) return false;
 
@@ -215,14 +215,7 @@ bool dm_application_update(dm_context* context)
         nk_label(ctx, "Render backend: Vulkan", NK_TEXT_LEFT);
 #endif
 
-        nk_layout_row_dynamic(ctx, 30, 1);
-        if(app_data->ray_trace) nk_label(ctx, "Render mode: Ray trace", NK_TEXT_LEFT);
-        else                    nk_label(ctx, "Render mode: Raster", NK_TEXT_LEFT);
-
         nk_style_set_font(ctx, &app_data->nk_context.fonts[0]->handle);
-        // render toggle
-        nk_layout_row_dynamic(ctx, 25, 1);
-        if(nk_button_label(ctx, "toggle render mode")) app_data->ray_trace = !app_data->ray_trace;
 
         nk_layout_row_dynamic(ctx, 30,1);
         nk_label(ctx, app_data->fps_text, NK_TEXT_LEFT);
@@ -247,9 +240,9 @@ bool dm_application_update(dm_context* context)
         // light source
         nk_label(ctx, "Light Position", NK_TEXT_LEFT);
         nk_layout_row_dynamic(ctx, 25, 4);
-        app_data->lights[0].position[0] = nk_propertyf(ctx, "X", -100, app_data->lights[0].position[0], 100, 5.f,0.5f);
-        app_data->lights[0].position[1] = nk_propertyf(ctx, "Y", -100, app_data->lights[0].position[1], 100, 5.f,0.5f);
-        app_data->lights[0].position[2] = nk_propertyf(ctx, "Z", -100, app_data->lights[0].position[2], 100, 5.f,0.5f);
+        app_data->lights[0].position_str[0] = nk_propertyf(ctx, "X", -100, app_data->lights[0].position_str[0], 100, 5.f,0.5f);
+        app_data->lights[0].position_str[1] = nk_propertyf(ctx, "Y", -100, app_data->lights[0].position_str[1], 100, 5.f,0.5f);
+        app_data->lights[0].position_str[2] = nk_propertyf(ctx, "Z", -100, app_data->lights[0].position_str[2], 100, 5.f,0.5f);
     }
     nk_end(&app_data->nk_context.ctx);
 
@@ -276,12 +269,11 @@ bool dm_application_render(dm_context* context)
     nuklear_gui_update_buffers(context);
 
     // raytracing has to happen outside of a render pass
-    if(app_data->ray_trace) rt_pipeline_render(context);
+    rt_pipeline_render(context);
 
     // render after
     dm_render_command_begin_render_pass(app_data->clear_color.r,app_data->clear_color.g,app_data->clear_color.b,app_data->clear_color.a, context);
-        if(app_data->ray_trace) quad_texture_render(app_data->rt_data.image, context);
-        else                    raster_pipeline_render(app_data->sponza_scene, context);
+        quad_texture_render(app_data->rt_data.image, context);
         
         nuklear_gui_render(context);
         debug_pipeline_render(context);

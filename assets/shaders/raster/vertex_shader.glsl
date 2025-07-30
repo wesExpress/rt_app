@@ -40,7 +40,7 @@ void main()
 {
     mat4 view_projection = uniform_buffers[camera_data_index].data.view_proj;
     
-    node_data node = node_buffer[gl_InstanceIndex];
+    node_data node = node_buffer[node_buffer_index].data[gl_InstanceIndex];
 
     world_pos   = node.model * vec4(vertex_position_u.xyz, 1);
     gl_Position = view_projection * world_pos;

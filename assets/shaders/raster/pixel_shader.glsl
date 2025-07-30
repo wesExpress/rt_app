@@ -77,8 +77,6 @@ layout(set=1, binding=0) uniform sampler   samplers[SAMPLER_HEAP_SIZE];
 
 void main()
 {
-    vec3 light = vec3(0,0,0);
-
     mat4 view_proj = scene_uniforms[camera_data_index].data.view_proj;
 
     node_data node = node_buffer[node_buffer_index].data[instance_index];
@@ -100,7 +98,7 @@ void main()
     // lighting
     light_source light = light_buffer[light_buffer_index].data[0];
 
-    vec3 color = calculate_lighting(world_pos.xyz, normal, light.pos, light.color, light.ambient, diffuse_color, view_proj[3].xyz, roughness, metallic);
+    vec3 color = calculate_lighting(world_pos.xyz, normal, light.position, light.color, light.ambient, diffuse_color, view_proj[3].xyz, roughness, metallic);
 
     pixel_color = vec4(light.ambient * occlusion + color + emission, 1);
 }

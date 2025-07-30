@@ -33,10 +33,9 @@ typedef struct material_t
 
 typedef struct light_source_t
 {
-    dm_vec3 position;
-    dm_vec3 color;
-    dm_vec3 ambient;
-    float   strength;
+    dm_vec4 position_str;
+    dm_vec4 color;
+    dm_vec4 ambient;
 } light_source;
 
 typedef struct mesh_t

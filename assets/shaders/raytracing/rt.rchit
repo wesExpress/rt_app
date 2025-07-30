@@ -12,6 +12,11 @@ struct payload
     uint bounce_count;
 };
 
+struct shadow_payload
+{
+    float attenuation;
+};
+
 struct material
 {
     uint diffuse_texture_index;
@@ -34,8 +39,21 @@ struct material
 struct mesh_data
 {
     uint vb_index, ib_index;
-    uint material_index;
-    uint padding;
+    uint padding[2];
+};
+
+struct node_data
+{
+    uint mesh_index, material_index;
+    uint padding[2];
+    mat4 model;
+};
+
+struct light_source
+{
+    vec4 position_str;
+    vec4 color;
+    vec4 ambient;
 };
 
 struct vertex
@@ -49,24 +67,30 @@ struct vertex
 layout(push_constant) uniform render_resources
 {
     uint acceleration_structure_index;
-    uint image_index, random_image_index;
+    uint image_index;
+    uint random_image_index;
     uint camera_data_index;
     uint scene_data_index;
+    uint node_buffer_index;
     uint material_buffer_index;
     uint mesh_buffer_index;
+    uint light_buffer_index;
 };
 
 layout(set=0, binding=0) uniform accelerationStructureEXT acceleration_structures[RESOURCE_HEAP_SIZE];
 
-layout(set=0, binding=0) buffer b0 { mesh_data data[]; } mesh_buffers[RESOURCE_HEAP_SIZE];
-layout(set=0, binding=0) buffer b1 { material data[]; }  material_buffers[RESOURCE_HEAP_SIZE];
-layout(set=0, binding=0) buffer b2 { vertex data[]; }    vertex_buffers[RESOURCE_HEAP_SIZE];
-layout(set=0, binding=0) buffer b3 { uint data[]; }      index_buffers[RESOURCE_HEAP_SIZE];
+layout(set=0, binding=0) buffer b0 { node_data data[]; }    node_buffers[RESOURCE_HEAP_SIZE];
+layout(set=0, binding=0) buffer b1 { mesh_data data[]; }    mesh_buffers[RESOURCE_HEAP_SIZE];
+layout(set=0, binding=0) buffer b2 { material data[]; }     material_buffers[RESOURCE_HEAP_SIZE];
+layout(set=0, binding=0) buffer b3 { light_source data[]; } light_buffer[RESOURCE_HEAP_SIZE];
+layout(set=0, binding=0) buffer b4 { vertex data[]; }       vertex_buffers[RESOURCE_HEAP_SIZE];
+layout(set=0, binding=0) buffer b5 { uint data[]; }         index_buffers[RESOURCE_HEAP_SIZE];
 
 layout(set=0, binding=0) uniform texture2D textures[RESOURCE_HEAP_SIZE];
 layout(set=1, binding=0) uniform sampler samplers[SAMPLER_HEAP_SIZE];
 
 layout(location=0) rayPayloadInEXT payload p;
+layout(location=1) rayPayloadEXT shadow_payload sp;
 hitAttributeEXT vec2 attribs;
 
 vec3 get_barycentrics(vec2 attribs)
@@ -109,11 +133,11 @@ void get_vertices_indexed(mesh_data m, inout vertex vertices[3])
 
 void main()
 {
-
     uint inst_index = gl_InstanceCustomIndexEXT;
 
-    mesh_data mesh = mesh_buffers[mesh_buffer_index].data[inst_index];
-    material  mat  = material_buffers[material_buffer_index].data[mesh.material_index];
+    node_data node = node_buffers[node_buffer_index].data[inst_index];
+    mesh_data mesh = mesh_buffers[mesh_buffer_index].data[node.mesh_index];
+    material  mat  = material_buffers[material_buffer_index].data[node.material_index];
 
     vertex vertices[3];
 
@@ -171,28 +195,22 @@ void main()
     normal = normalize(TBN * normal);
 
     // lighting
-    vec3 light_pos = { 0,0,0 };
-    vec3 light_color = { 1,1,1 };
-    vec3 light_ambient = { 0.1f,0.1f,0.1f };
-    light_ambient *= occlusion;
+    light_source light = light_buffer[light_buffer_index].data[0];
 
-    vec3 color = calculate_lighting(position, normal, light_pos, light_color, light_ambient, diffuse_color, gl_WorldRayOriginEXT, roughness, metallic);
+    vec3 color = calculate_lighting(position, normal, light.position_str.xyz, light.color.rgb, light.ambient.rgb, diffuse_color, gl_WorldRayOriginEXT, roughness, metallic);
 
-    p.color += vec4(color + emission, 1);
+    sp.attenuation = 0.3f;
+    vec3 light_direction = light.position_str.xyz - position;
 
-    if(p.bounce_count > 0)
-    {
-        p.bounce_count--;
-        traceRayEXT(acceleration_structures[acceleration_structure_index], 
-            gl_RayFlagsOpaqueEXT | gl_RayFlagsTerminateOnFirstHitEXT, 
-            0xFF, 
-            0,1,0, 
-            position, 
-            0.001, 
-            reflect(gl_WorldRayDirectionEXT, normalize(normal + roughness)), 
-            1000.0, 
-            0);
+    traceRayEXT(acceleration_structures[acceleration_structure_index], 
+        gl_RayFlagsOpaqueEXT | gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 
+        0xFF, 
+        0,0,1, 
+        position, 
+        0.001, 
+        normalize(light_direction), 
+        length(light_direction), 
+        1);
 
-    }
-    else p.bounce_count = 0;
+    p.color += vec4(light.ambient.rgb * occlusion + color * sp.attenuation + emission, 1);
 }
