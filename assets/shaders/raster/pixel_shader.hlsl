@@ -42,10 +42,8 @@ struct camera_data
 
 struct light_source
 {
-    float3 position;
-    float3 color;
-    float3 ambient;
-    float  strength;
+    float4 position_str;
+    float4 color;
 };
 
 struct render_resources 
@@ -97,8 +95,8 @@ float4 main(FRAGMENT_IN frag_in) : SV_Target
     // lighting
     light_source light = lights[0];
 
-    float3 color = calculate_lighting(frag_in.world_pos.xyz, normal, light.position, light.color, light.ambient, diffuse_color, transpose(camera.view_proj)[3].xyz, roughness, metallic);
+    float3 color = calculate_lighting(frag_in.world_pos.xyz, normal, light.position_str.xyz, light.color.rgb, diffuse_color, transpose(camera.view_proj)[3].xyz, roughness, metallic);
 
     // final color
-    return float4(light.ambient * occlusion + color + emission, 1);
+    return float4(color + emission, 1);
 }

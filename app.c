@@ -67,8 +67,6 @@ bool dm_application_init(dm_context* context)
     //if(!dm_renderer_load_gltf_file("assets/models/DamagedHelmet.glb", attribs, _countof(attribs), app_data->meshes, &app_data->mesh_count, materials, &app_data->material_count, context)) return false;
     if(!dm_renderer_load_gltf_file("assets/models/sponza-optimized/Sponza.gltf", attribs, _countof(attribs), &app_data->sponza_scene, context)) return false;
 
-    //if(!LOAD_MESH_GLTF("assets/models/sponza-optimized/Sponza.gltf", 0, attribs, &app_data->meshes[app_data->mesh_count++], &materials[app_data->material_count++], context)) return false;
-
     {
         app_data->meshes = dm_alloc(sizeof(mesh) * app_data->sponza_scene.mesh_count);
         for(uint32_t i=0; i<app_data->sponza_scene.mesh_count; i++)

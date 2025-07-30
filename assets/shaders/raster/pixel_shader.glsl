@@ -50,10 +50,8 @@ struct camera_data
 
 struct light_source
 {
-    vec3 position;
-    vec3 color;
-    vec3 ambient;
-    float strength;
+    vec4 position_str;
+    vec4 color;
 };
 
 layout(push_constant) uniform render_resources
@@ -98,8 +96,8 @@ void main()
     // lighting
     light_source light = light_buffer[light_buffer_index].data[0];
 
-    vec3 color = calculate_lighting(world_pos.xyz, normal, light.position, light.color, light.ambient, diffuse_color, view_proj[3].xyz, roughness, metallic);
+    vec3 color = calculate_lighting(world_pos.xyz, normal, light.position_str.xyz, light.color.rgb, diffuse_color, view_proj[3].xyz, roughness, metallic);
 
-    pixel_color = vec4(light.ambient * occlusion + color + emission, 1);
+    pixel_color = vec4(color + emission, 1);
 }
 

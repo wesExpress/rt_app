@@ -33,7 +33,7 @@ float3 fresnel_schlick(float h_dot_v, float3 base_reflectivity)
     return base_reflectivity + (1 - base_reflectivity) * pow(1 - h_dot_v, 5);
 }
 
-float3 calculate_lighting(float3 position, float3 normal, float3 light_pos, float3 light_color, float3 ambient_color, float3 albedo, float3 camera_position, float roughness, float metallic)
+float3 calculate_lighting(float3 position, float3 normal, float3 light_pos, float3 light_color, float3 albedo, float3 camera_position, float roughness, float metallic)
 {
     float3 base_reflectivity = albedo * metallic;
 

@@ -53,7 +53,6 @@ struct light_source
 {
     vec4 position_str;
     vec4 color;
-    vec4 ambient;
 };
 
 struct vertex
@@ -197,7 +196,7 @@ void main()
     // lighting
     light_source light = light_buffer[light_buffer_index].data[0];
 
-    vec3 color = calculate_lighting(position, normal, light.position_str.xyz, light.color.rgb, light.ambient.rgb, diffuse_color, gl_WorldRayOriginEXT, roughness, metallic);
+    vec3 color = calculate_lighting(position, normal, light.position_str.xyz, light.color.rgb, diffuse_color, gl_WorldRayOriginEXT, roughness, metallic);
 
     sp.attenuation = 0.3f;
     vec3 light_direction = light.position_str.xyz - position;
@@ -212,5 +211,5 @@ void main()
         length(light_direction), 
         1);
 
-    p.color += vec4(light.ambient.rgb * occlusion + color * sp.attenuation + emission, 1);
+    p.color += vec4(color * sp.attenuation + emission, 1);
 }
